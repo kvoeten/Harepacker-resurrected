@@ -27,6 +27,8 @@ using System.Xml;
 using System.Drawing;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Text.RegularExpressions;
 
 namespace MapleLib.WzLib.Serialization
 {
@@ -49,6 +51,12 @@ namespace MapleLib.WzLib.Serialization
             }
             Directory.CreateDirectory(path);
         }
+    }
+
+    public abstract class WzJsonSerializer : ProgressingWzSerializer
+    {
+        static WzJsonSerializer() { }
+        public WzJsonSerializer() { }
     }
 
     public abstract class WzXmlSerializer : ProgressingWzSerializer
@@ -445,6 +453,1044 @@ namespace MapleLib.WzLib.Serialization
                 ExportRecursion(((WzUOLProperty)currObj).LinkValue, outPath);
         }
     }
+
+    public class WzJSONSerializer : WzJsonSerializer, IWzDirectorySerializer
+    {
+        public WzJSONSerializer()
+        { }
+
+        //Creates folder with WZ file name
+        private void exportDirJSONInternal(WzDirectory dir, string path)
+        {
+            if (!Directory.Exists(path))
+                createDirSafe(ref path);
+
+            if (path.Substring(path.Length - 1) != @"\")
+                path += @"\";
+
+            switch (dir.name)
+            {
+                case "Item.wz":
+                    ItemToJSON(dir, path);
+                    break;
+                case "String.wz":
+                    StringToJSON(dir, path);
+                    break;
+                case "Character.wz":
+                    CharacterToJSON(dir, path);
+                    break;
+                case "Mob.wz":
+                case "Mob2.wz":
+                    MobToJSON(dir, path);
+                    break;
+            }
+        }
+
+        public void SerializeDirectory(WzDirectory dir, string path)
+        {
+            total = dir.CountImages(); curr = 0;
+            exportDirJSONInternal(dir, path);
+        }
+
+        public void SerializeFile(WzFile file, string path)
+        {
+            SerializeDirectory(file.WzDirectory, path);
+        }
+
+        private void MobToJSON(WzDirectory dir, string path)
+        {
+            foreach (WzDirectory mob in dir.subDirs)
+            {
+                WzSubProperty info = (WzSubProperty)mob["info"];
+
+                string icon = "";
+                string link = "";
+
+                //Resolve icon
+                if (info["link"] != null) //Link has no icon
+                {
+                    link = info["link"].ReadString("");
+                }
+                else if (info["skeleton"] == null) //Skels have no icons
+                {
+                    if (info["thumbnail"] != null) //Zakum altar has thumbnail instead of stand.
+                    {
+                        MemoryStream stream = new MemoryStream();
+                        if (info["thumbnail"].PropertyType == WzPropertyType.Canvas)
+                        {
+                            WzCanvasProperty img = (WzCanvasProperty)info["thumbnail"];
+                            if (img == null) continue;
+                            img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                        else if (info["thumbnail"].PropertyType == WzPropertyType.UOL)
+                        {
+                            WzUOLProperty uol = (WzUOLProperty)info["thumbnail"];
+                            WzCanvasProperty img = (WzCanvasProperty)uol.LinkValue;
+                            if (img == null) continue;
+                            img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+
+                        byte[] pngbytes = stream.ToArray();
+                        stream.Close();
+                        icon += Convert.ToBase64String(pngbytes);
+                    }
+                    else if (info["stand"] != null && info["stand"]["0"] != null)
+                    {
+                        MemoryStream stream = new MemoryStream();
+                        if (info["stand"]["0"].PropertyType == WzPropertyType.Canvas)
+                        {
+                            WzCanvasProperty img = (WzCanvasProperty)info["stand"]["0"];
+                            if (img == null) continue;
+                            img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                        else if (info["stand"]["0"].PropertyType == WzPropertyType.UOL)
+                        {
+                            WzUOLProperty uol = (WzUOLProperty)info["stand"]["0"];
+                            WzCanvasProperty img = (WzCanvasProperty)uol.LinkValue;
+                            if (img == null) continue;
+                            img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+
+                        byte[] pngbytes = stream.ToArray();
+                        stream.Close();
+                        icon += Convert.ToBase64String(pngbytes);
+                    }
+                }
+
+                int acc = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int bodyAttack = info["bodyAttack"] == null ? 0 : info["bodyAttack"].ReadValue();
+                int boss = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int category = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int charismaEXP = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int eva = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int firstAttack = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int fs = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int hpRecovery = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int hpTagBgcolor = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int hpTagColor = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int level = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int MADamage = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                long defaultHP = info["acc"] == null ? 0 : info["acc"].ReadLong();
+                long defaultMP = info["acc"] == null ? 0 : info["acc"].ReadLong();
+                long maxHP = info["acc"] == null ? 0 : info["acc"].ReadLong();
+                long maxMP = info["acc"] == null ? 0 : info["acc"].ReadLong();
+                long finalmaxHP = info["acc"] == null ? 0 : info["acc"].ReadLong();
+                int mbookID = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int MDDamage = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int MDRate = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int mobType = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int mpRecovery = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int noFlip = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int PADamage = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int PDDamage = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int PDRate = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int pushed = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int summonType = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int elemAttr = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                long exp = info["acc"] == null ? 0 : info["acc"].ReadLong();
+                int explosiveReward = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int ignoreFieldOut = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int ignoreMoveImpact = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int individualReward = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int overSpeed = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int useReaction = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int wp = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int invincible = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int fixedDamage = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int HPgaugeHide = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int PassiveDisease = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int PartyBonusMob = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int showNotRemoteDam = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int hideName = info["acc"] == null ? 0 : info["acc"].ReadValue();
+
+                //Revive: mobs spawned upon death.
+                string revive = "[";
+                if (info["revive"] != null)
+                {
+                    foreach (WzSubProperty spawn in info["revive"].WzProperties)
+                    {
+                        revive += spawn.ReadValue() + ",";
+                    }
+                    revive = revive.Substring(0, revive.Length - 1);
+                }
+                revive += "]";
+
+                //Skills
+                string skills = "[";
+                if (info["skill"] != null)
+                {
+                    foreach (WzSubProperty skill in info["skill"].WzProperties)
+                    {
+                        skills += skill.ReadValue() + ",";
+                    }
+                    skills = skills.Substring(0, skills.Length - 1);
+                }
+                skills += "]";
+            }
+        }
+
+        private void CharacterToJSON(WzDirectory dir, string path)
+        {
+            //Categories
+            WzDirectory[] categories = {
+                (WzDirectory)dir["Accessory"],
+                (WzDirectory)dir["Android"],
+                (WzDirectory)dir["ArcaneForce"],
+                (WzDirectory)dir["Bits"],
+                (WzDirectory)dir["Cap"],
+                (WzDirectory)dir["Cape"],
+                (WzDirectory)dir["Coat"],
+                (WzDirectory)dir["Dragon"],
+                (WzDirectory)dir["Face"],
+                (WzDirectory)dir["Familiar"],
+                (WzDirectory)dir["Glove"],
+                (WzDirectory)dir["Hair"],
+                (WzDirectory)dir["Longcoat"],
+                (WzDirectory)dir["Mechanic"],
+                (WzDirectory)dir["MonsterBook"],
+                (WzDirectory)dir["Pants"],
+                (WzDirectory)dir["PetEquip"],
+                (WzDirectory)dir["Ring"],
+                (WzDirectory)dir["Shield"],
+                (WzDirectory)dir["Shoes"],
+                (WzDirectory)dir["TamingMob"],
+                (WzDirectory)dir["Totem"],
+                (WzDirectory)dir["Weapon"]
+            };
+
+            HashSet<string> props = new HashSet<string>();
+            foreach (WzDirectory cat in categories)
+            {
+                foreach (WzImage item in cat.WzImages)
+                {
+                    String JSON = "{";
+                    JSON += "\"id\":\"" + item.name.Replace(".img", "") + "\",";
+
+                    WzSubProperty info = (WzSubProperty)item["info"];
+
+                    //Standard Values
+                    JSON += "\"cash\":\"" + info["cash"].ReadValue() + "\",";
+                    JSON += "\"iSlot\":\"" + info["iSlot"].ReadString("") + "\",";
+                    JSON += "\"vSlot\":\"" + info["vSlot"].ReadString("") + "\",";
+                    JSON += "\"reqJob\":\"" + info["reqJob"].ReadValue() + "\",";
+                    JSON += "\"reqLevel\":\"" + info["reqLevel"].ReadValue() + "\",";
+                    JSON += "\"reqSTR\":\"" + info["reqSTR"].ReadValue() + "\",";
+                    JSON += "\"reqDEX\":\"" + info["reqDEX"].ReadValue() + "\",";
+                    JSON += "\"reqINT\":\"" + info["reqINT"].ReadValue() + "\",";
+                    JSON += "\"reqLUK\":\"" + info["reqLUK"].ReadValue() + "\",";
+
+                    MemoryStream stream = new MemoryStream();
+                    if (info["icon"] != null)
+                    {
+                        if (info["icon"].PropertyType == WzPropertyType.Canvas)
+                        {
+                            WzCanvasProperty img = (WzCanvasProperty)info["icon"];
+                            if (img == null) continue;
+                            img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                        else if (info["icon"].PropertyType == WzPropertyType.UOL)
+                        {
+                            WzUOLProperty uol = (WzUOLProperty)info["icon"];
+                            WzCanvasProperty img = (WzCanvasProperty)uol.LinkValue;
+                            if (img == null) continue;
+                            img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                    }
+
+                    byte[] pngbytes = stream.ToArray();
+                    stream.Close();
+                    JSON += "\"icon\":\"" + Convert.ToBase64String(pngbytes) + "\",";
+
+                    int setItemID = info["setItemID"] == null ? 0 : info["setItemID"].ReadValue();
+                    int tuc = info["tuc"] == null ? 0 : info["tuc"].ReadValue();
+                    int price = info["price"] == null ? 0 : info["price"].ReadValue();
+                    int notSale = info["notSale"] == null ? 0 : info["notSale"].ReadValue();
+                    int only = info["only"] == null ? 0 : info["only"].ReadValue();
+                    int tradeBlock = info["tradeBlock"] == null ? 0 : info["tradeBlock"].ReadValue();
+                    int onlyEquip = info["onlyEquip"] == null ? 0 : info["onlyEquip"].ReadValue();
+                    int addition = info["addition"] == null ? 0 : info["addition"].ReadValue();
+                    int incPDD = info["incPDD"] == null ? 0 : info["incPDD"].ReadValue();
+                    int incMDD = info["incMDD"] == null ? 0 : info["incMDD"].ReadValue();
+                    int incPAD = info["incPAD"] == null ? 0 : info["incPAD"].ReadValue();
+                    int incMAD = info["incMAD"] == null ? 0 : info["incMAD"].ReadValue();
+                    int incSTR = info["incSTR"] == null ? 0 : info["incSTR"].ReadValue();
+                    int incINT = info["incINT"] == null ? 0 : info["incINT"].ReadValue();
+                    int incDEX = info["incDEX"] == null ? 0 : info["incDEX"].ReadValue();
+                    int incLUK = info["incLUK"] == null ? 0 : info["incLUK"].ReadValue();
+                    int superiorEqp = info["superiorEqp"] == null ? 0 : info["superiorEqp"].ReadValue();
+                    int tradeAvailable = info["tradeAvailable"] == null ? 0 : info["tradeAvailable"].ReadValue();
+                    int exItem = info["exItem"] == null ? 0 : info["exItem"].ReadValue();
+                    int incMHP = info["incMHP"] == null ? 0 : info["incMHP"].ReadValue();
+                    int incMMP = info["incMMP"] == null ? 0 : info["incMMP"].ReadValue();
+                    int medalTag = info["medalTag"] == null ? 0 : info["medalTag"].ReadValue();
+                    int incACC = info["incACC"] == null ? 0 : info["incACC"].ReadValue();
+                    int incEVA = info["incEVA"] == null ? 0 : info["incEVA"].ReadValue();
+                    int timeLimited = info["timeLimited"] == null ? 0 : info["timeLimited"].ReadValue();
+                    int incSpeed = info["incSpeed"] == null ? 0 : info["incSpeed"].ReadValue();
+                    int fixedPotential = info["fixedPotential"] == null ? 0 : info["fixedPotential"].ReadValue();
+                    int fixedGrade = info["fixedGrade"] == null ? 0 : info["fixedGrade"].ReadValue();
+                    int specialGrade = info["specialGrade"] == null ? 0 : info["specialGrade"].ReadValue();
+                    int option = info["option"] == null ? 0 : info["option"].ReadValue();
+                    int charismaEXP = info["charismaEXP"] == null ? 0 : info["charismaEXP"].ReadValue();
+                    int charmEXP = info["charmEXP"] == null ? 0 : info["charmEXP"].ReadValue();
+                    int willEXP = info["willEXP"] == null ? 0 : info["willEXP"].ReadValue();
+                    int notExtend = info["notExtend"] == null ? 0 : info["notExtend"].ReadValue();
+                    int exGrade = info["exGrade"] == null ? 0 : info["exGrade"].ReadValue();
+                    int level = info["level"] == null ? 0 : info["level"].ReadValue();
+                    int incJump = info["incJump"] == null ? 0 : info["incJump"].ReadValue();
+                    int bossReward = info["bossReward"] == null ? 0 : info["bossReward"].ReadValue();
+                    int sharableOnce = info["sharableOnce"] == null ? 0 : info["sharableOnce"].ReadValue();
+                    int accountSharable = info["accountSharable"] == null ? 0 : info["accountSharable"].ReadValue();
+                    int baseLevel = info["baseLevel"] == null ? 0 : info["baseLevel"].ReadValue();
+                    int abilityTimeLimited = info["abilityTimeLimited"] == null ? 0 : info["abilityTimeLimited"].ReadValue();
+                    int incMHPr = info["incMHPr"] == null ? 0 : info["incMHPr"].ReadValue();
+                    int incMMPr = info["incMMPr"] == null ? 0 : info["incMMPr"].ReadValue();
+                    int equipTradeBlock = info["equipTradeBlock"] == null ? 0 : info["equipTradeBlock"].ReadValue();
+                    int bonusExp = info["bonusExp"] == null ? 0 : info["bonusExp"].ReadValue();
+                    int reduceReq = info["reduceReq"] == null ? 0 : info["reduceReq"].ReadValue();
+                    int incCraft = info["incCraft"] == null ? 0 : info["incCraft"].ReadValue();
+                    int scope = info["scope"] == null ? 0 : info["scope"].ReadValue();
+                    int accountShareTag = info["accountShareTag"] == null ? 0 : info["accountShareTag"].ReadValue();
+                    int bdR = info["bdR"] == null ? 0 : info["bdR"].ReadValue();
+                    int imdR = info["imdR"] == null ? 0 : info["imdR"].ReadValue();
+                    int noPotential = info["noPotential"] == null ? 0 : info["noPotential"].ReadValue();
+                    int dayOfWeekItemStat = info["dayOfWeekItemStat"] == null ? 0 : info["dayOfWeekItemStat"].ReadValue();
+                    int slotMax = info["slotMax"] == null ? 0 : info["slotMax"].ReadValue();
+                    int noExpend = info["noExpend"] == null ? 0 : info["noExpend"].ReadValue();
+                    int specialID = info["specialID"] == null ? 0 : info["specialID"].ReadValue();
+                    int invisibleFace = info["invisibleFace"] == null ? 0 : info["invisibleFace"].ReadValue();
+                    int noMoveToLocker = info["noMoveToLocker"] == null ? 0 : info["noMoveToLocker"].ReadValue();
+                    int cashForceCharmExp = info["cashForceCharmExp"] == null ? 0 : info["cashForceCharmExp"].ReadValue();
+                    int reqPOP = info["reqPOP"] == null ? 0 : info["reqPOP"].ReadValue();
+                    int attackSpeed = info["attackSpeed"] == null ? 0 : info["attackSpeed"].ReadValue();
+                    int TimeLimited = info["TimeLimited"] == null ? 0 : info["TimeLimited"].ReadValue();
+                    int reqSpecJob = info["reqSpecJob"] == null ? 0 : info["reqSpecJob"].ReadValue();
+                    int durability = info["durability"] == null ? 0 : info["durability"].ReadValue();
+                    int replace = info["replace"] == null ? 0 : info["replace"].ReadValue();
+                    int insightEXP = info["insightEXP"] == null ? 0 : info["insightEXP"].ReadValue();
+                    int onlyUpgrade = info["onlyUpgrade"] == null ? 0 : info["onlyUpgrade"].ReadValue();
+                    int epicItem = info["epicItem"] == null ? 0 : info["epicItem"].ReadValue();
+                    int exceptUpgrade = info["exceptUpgrade"] == null ? 0 : info["exceptUpgrade"].ReadValue();
+                    int exceptToadsHammer = info["exceptToadsHammer"] == null ? 0 : info["exceptToadsHammer"].ReadValue();
+                    int exceptTransmission = info["exceptTransmission"] == null ? 0 : info["exceptTransmission"].ReadValue();
+                    int equipDrop = info["equipDrop"] == null ? 0 : info["equipDrop"].ReadValue();
+                    int blockGoldHammer = info["blockGoldHammer"] == null ? 0 : info["blockGoldHammer"].ReadValue();
+                    int bdr = info["bdr"] == null ? 0 : info["bdr"].ReadValue();
+                    int senseEXP = info["senseEXP"] == null ? 0 : info["senseEXP"].ReadValue();
+                    int craftEXP = info["craftEXP"] == null ? 0 : info["craftEXP"].ReadValue();
+                    int StarPlanet = info["StarPlanet"] == null ? 0 : info["StarPlanet"].ReadValue();
+                    int jewelCraft = info["jewelCraft"] == null ? 0 : info["jewelCraft"].ReadValue();
+                    int effect = info["effect"] == null ? 0 : info["effect"].ReadValue();
+                    int tradBlock = info["tradBlock"] == null ? 0 : info["tradBlock"].ReadValue();
+                    int MaxHP = info["MaxHP"] == null ? 0 : info["MaxHP"].ReadValue();
+                    int PotionDiscount = info["PotionDiscount"] == null ? 0 : info["PotionDiscount"].ReadValue();
+                    int cubeExBaseOptionLevel = info["cubeExBaseOptionLevel"] == null ? 0 : info["cubeExBaseOptionLevel"].ReadValue();
+                    int bonusDrop = info["bonusDrop"] == null ? 0 : info["bonusDrop"].ReadValue();
+                    int incCriticalMAXDamage = info["incCriticalMAXDamage"] == null ? 0 : info["incCriticalMAXDamage"].ReadValue();
+                    int expireOnLogout = info["expireOnLogout"] == null ? 0 : info["expireOnLogout"].ReadValue();
+                    int jokerToSetItem = info["jokerToSetItem"] == null ? 0 : info["jokerToSetItem"].ReadValue();
+                    int speed = info["speed"] == null ? 0 : info["speed"].ReadValue();
+                    int dropBlock = info["dropBlock"] == null ? 0 : info["dropBlock"].ReadValue();
+                    int incPVPDamage = info["incPVPDamage"] == null ? 0 : info["incPVPDamage"].ReadValue();
+                    int randVariation = info["randVariation"] == null ? 0 : info["randVariation"].ReadValue();
+                    int incPDDr = info["incPDDr"] == null ? 0 : info["incPDDr"].ReadValue();
+                    int incMDDr = info["incMDDr"] == null ? 0 : info["incMDDr"].ReadValue();
+                    int incDAMr = info["incDAMr"] == null ? 0 : info["incDAMr"].ReadValue();
+                    int night = info["night"] == null ? 0 : info["night"].ReadValue();
+                    int CuttableCount = info["CuttableCount"] == null ? 0 : info["CuttableCount"].ReadValue();
+                    string equippedEmotion = info["equippedEmotion"] == null ? "" : info["equippedEmotion"].ReadString("");
+                    string equippedSound = info["equippedSound"] == null ? "" : info["equippedSound"].ReadString("");
+                    int PDD = info["PDD"] == null ? 0 : info["PDD"].ReadValue();
+                    int noDrop = info["noDrop"] == null ? 0 : info["noDrop"].ReadValue();
+                    int incCr = info["incCr"] == null ? 0 : info["incCr"].ReadValue();
+                    int android = info["android"] == null ? 0 : info["android"].ReadValue();
+                    int grade = info["grade"] == null ? 0 : info["grade"].ReadValue();
+                    int androidKey = info["androidKey"] == null ? 0 : info["androidKey"].ReadValue();
+                    int mulVestigeCount = info["mulVestigeCount"] == null ? 0 : info["mulVestigeCount"].ReadValue();
+                    int incARC = info["incARC"] == null ? 0 : info["incARC"].ReadValue();
+                    int scanTradeBlock = info["scanTradeBlock"] == null ? 0 : info["scanTradeBlock"].ReadValue();
+                    int reqQuestOnProgress = info["reqQuestOnProgress"] == null ? 0 : info["reqQuestOnProgress"].ReadValue();
+                    int bitsSlot = info["bitsSlot"] == null ? 0 : info["bitsSlot"].ReadValue();
+                    int royalSpecial = info["royalSpecial"] == null ? 0 : info["royalSpecial"].ReadValue();
+                    int effectItemID = info["effectItemID"] == null ? 0 : info["effectItemID"].ReadValue();
+                    int reqJob2 = info["reqJob2"] == null ? 0 : info["reqJob2"].ReadValue();
+                    int origin = info["origin"] == null ? 0 : info["origin"].ReadValue();
+                    int quest = info["quest"] == null ? 0 : info["quest"].ReadValue();
+                    int enchantCategory = info["enchantCategory"] == null ? 0 : info["enchantCategory"].ReadValue();
+                    int IUCMax = info["IUCMax"] == null ? 0 : info["IUCMax"].ReadValue();
+                    int transform = info["transform"] == null ? 0 : info["transform"].ReadValue();
+                    int weekly = info["weekly"] == null ? 0 : info["weekly"].ReadValue();
+                    int masterSpecial = info["masterSpecial"] == null ? 0 : info["masterSpecial"].ReadValue();
+                    int keywordEffect = info["keywordEffect"] == null ? 0 : info["keywordEffect"].ReadValue();
+                    int extendFrame = info["extendFrame"] == null ? 0 : info["extendFrame"].ReadValue();
+                    int vehicleDefaultFrame = info["vehicleDefaultFrame"] == null ? 0 : info["vehicleDefaultFrame"].ReadValue();
+                    int cashTradeBlock = info["cashTradeBlock"] == null ? 0 : info["cashTradeBlock"].ReadValue();
+                    int onlyCash = info["onlyCash"] == null ? 0 : info["onlyCash"].ReadValue();
+                    int sample = info["sample"] == null ? 0 : info["sample"].ReadValue();
+                    int lookChangeType = info["lookChangeType"] == null ? 0 : info["lookChangeType"].ReadValue();
+                    int isAbleToTradeOnce = info["isAbleToTradeOnce"] == null ? 0 : info["isAbleToTradeOnce"].ReadValue();
+                    int incHP = info["incHP"] == null ? 0 : info["incHP"].ReadValue();
+                    int acc = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                    int pachinko = info["pachinko"] == null ? 0 : info["pachinko"].ReadValue();
+                    int noExtend = info["noExtend"] == null ? 0 : info["noExtend"].ReadValue();
+                    int addtion = info["addtion"] == null ? 0 : info["addtion"].ReadValue();
+                    int groupEffectID = info["groupEffectID"] == null ? 0 : info["groupEffectID"].ReadValue();
+                    int variableStat = info["variableStat"] == null ? 0 : info["variableStat"].ReadValue();
+                    int undecomposable = info["undecomposable"] == null ? 0 : info["undecomposable"].ReadValue();
+                    int despair = info["despair"] == null ? 0 : info["despair"].ReadValue();
+                    int love = info["love"] == null ? 0 : info["love"].ReadValue();
+                    int shine = info["shine"] == null ? 0 : info["shine"].ReadValue();
+                    int blaze = info["blaze"] == null ? 0 : info["blaze"].ReadValue();
+                    int hum = info["hum"] == null ? 0 : info["hum"].ReadValue();
+                    int bowing = info["bowing"] == null ? 0 : info["bowing"].ReadValue();
+                    int hot = info["hot"] == null ? 0 : info["hot"].ReadValue();
+                    int range = info["range"] == null ? 0 : info["range"].ReadValue();
+                    int skill = info["skill"] == null ? 0 : info["skill"].ReadValue();
+                    int pad = info["pad"] == null ? 0 : info["pad"].ReadValue();
+                    string FAttribute = info["FAttribute"] == null ? "" : info["FAttribute"].ReadString("");
+                    string FCategory = info["FCategory"] == null ? "" : info["FCategory"].ReadString("");
+                    int MobID = info["MobID"] == null ? 0 : info["MobID"].ReadValue();
+                    int mob = info["mob"] == null ? 0 : info["mob"].ReadValue();
+                    int noPotentialFieldtype = info["noPotentialFieldtype"] == null ? 0 : info["noPotentialFieldtype"].ReadValue();
+                    int incLUk = info["incLUk"] == null ? 0 : info["incLUk"].ReadValue();
+                    int recovery = info["recovery"] == null ? 0 : info["recovery"].ReadValue();
+                    int linkedPairItem = info["linkedPairItem"] == null ? 0 : info["linkedPairItem"].ReadValue();
+                    int pickUpBlock = info["pickUpBlock"] == null ? 0 : info["pickUpBlock"].ReadValue();
+                    int pickupMeso = info["pickupMeso"] == null ? 0 : info["pickupMeso"].ReadValue();
+                    int pickupItem = info["pickupItem"] == null ? 0 : info["pickupItem"].ReadValue();
+                    int pickupOthers = info["pickupOthers"] == null ? 0 : info["pickupOthers"].ReadValue();
+                    int sweepForDrop = info["sweepForDrop"] == null ? 0 : info["sweepForDrop"].ReadValue();
+                    int longRange = info["longRange"] == null ? 0 : info["longRange"].ReadValue();
+                    int consumeMP = info["consumeMP"] == null ? 0 : info["consumeMP"].ReadValue();
+                    int ignorePickup = info["ignorePickup"] == null ? 0 : info["ignorePickup"].ReadValue();
+                    int autoBuff = info["autoBuff"] == null ? 0 : info["autoBuff"].ReadValue();
+                    int consumeHP = info["consumeHP"] == null ? 0 : info["consumeHP"].ReadValue();
+                    string text = info["text"] == null ? "" : info["text"].ReadString("");
+                    int textColor = info["textColor"] == null ? 0 : info["textColor"].ReadValue();
+                    int textOffsetX = info["textOffsetX"] == null ? 0 : info["textOffsetX"].ReadValue();
+                    int textOffsetY = info["textOffsetY"] == null ? 0 : info["textOffsetY"].ReadValue();
+                    int textFontSize = info["textFontSize"] == null ? 0 : info["textFontSize"].ReadValue();
+                    int textAreaX = info["textAreaX"] == null ? 0 : info["textAreaX"].ReadValue();
+                    int textAreaY = info["textAreaY"] == null ? 0 : info["textAreaY"].ReadValue();
+                    int consumeCure = info["consumeCure"] == null ? 0 : info["consumeCure"].ReadValue();
+                    int smartPet = info["smartPet"] == null ? 0 : info["smartPet"].ReadValue();
+                    int ringOptionSkill = info["ringOptionSkill"] == null ? 0 : info["ringOptionSkill"].ReadValue();
+                    int ringOptionSkillLv = info["ringOptionSkillLv"] == null ? 0 : info["ringOptionSkillLv"].ReadValue();
+                    int chatBalloon = info["chatBalloon"] == null ? 0 : info["chatBalloon"].ReadValue();
+                    int nameTag = info["nameTag"] == null ? 0 : info["nameTag"].ReadValue();
+                    int tradeblock = info["tradeblock"] == null ? 0 : info["tradeblock"].ReadValue();
+                    int TradeBlock = info["TradeBlock"] == null ? 0 : info["TradeBlock"].ReadValue();
+                    int expBuff = info["expBuff"] == null ? 0 : info["expBuff"].ReadValue();
+                    int expRate = info["expRate"] == null ? 0 : info["expRate"].ReadValue();
+                    int reqRace = info["reqRace"] == null ? 0 : info["reqRace"].ReadValue();
+                    int bloodAllianceExpRate = info["bloodAllianceExpRate"] == null ? 0 : info["bloodAllianceExpRate"].ReadValue();
+                    int bloodAlliancePartyExpRate = info["bloodAlliancePartyExpRate"] == null ? 0 : info["bloodAlliancePartyExpRate"].ReadValue();
+                    int unchangeable = info["unchangeable"] == null ? 0 : info["unchangeable"].ReadValue();
+                    int pmdR = info["pmdR"] == null ? 0 : info["pmdR"].ReadValue();
+                    int hitDamRatePlus = info["hitDamRatePlus"] == null ? 0 : info["hitDamRatePlus"].ReadValue();
+                    int fs = info["fs"] == null ? 0 : info["fs"].ReadValue();
+                    int tamingMob = info["tamingMob"] == null ? 0 : info["tamingMob"].ReadValue();
+                    int vehicleSkillIsTown = info["vehicleSkillIsTown"] == null ? 0 : info["vehicleSkillIsTown"].ReadValue();
+                    int vehicleDoubleJumpLevel = info["vehicleDoubleJumpLevel"] == null ? 0 : info["vehicleDoubleJumpLevel"].ReadValue();
+                    int incSwim = info["incSwim"] == null ? 0 : info["incSwim"].ReadValue();
+                    int incFatigue = info["incFatigue"] == null ? 0 : info["incFatigue"].ReadValue();
+                    int hpRecovery = info["hpRecovery"] == null ? 0 : info["hpRecovery"].ReadValue();
+                    int mpRecovery = info["mpRecovery"] == null ? 0 : info["mpRecovery"].ReadValue();
+                    int vehicleNaviFlyingLevel = info["vehicleNaviFlyingLevel"] == null ? 0 : info["vehicleNaviFlyingLevel"].ReadValue();
+                    int removeBody = info["removeBody"] == null ? 0 : info["removeBody"].ReadValue();
+                    int vehicleGlideLevel = info["vehicleGlideLevel"] == null ? 0 : info["vehicleGlideLevel"].ReadValue();
+                    int vehicleNewFlyingLevel = info["vehicleNewFlyingLevel"] == null ? 0 : info["vehicleNewFlyingLevel"].ReadValue();
+                    int ActionEffect = info["ActionEffect"] == null ? 0 : info["ActionEffect"].ReadValue();
+                    int dx = info["dx"] == null ? 0 : info["dx"].ReadValue();
+                    int dy = info["dy"] == null ? 0 : info["dy"].ReadValue();
+                    int partsQuestID = info["partsQuestID"] == null ? 0 : info["partsQuestID"].ReadValue();
+                    int partsCount = info["partsCount"] == null ? 0 : info["partsCount"].ReadValue();
+                    int customVehicle = info["customVehicle"] == null ? 0 : info["customVehicle"].ReadValue();
+                    int passengerNum = info["passengerNum"] == null ? 0 : info["passengerNum"].ReadValue();
+                    int flip = info["flip"] == null ? 0 : info["flip"].ReadValue();
+                    int walk = info["walk"] == null ? 0 : info["walk"].ReadValue();
+                    int stand = info["stand"] == null ? 0 : info["stand"].ReadValue();
+                    int attack = info["attack"] == null ? 0 : info["attack"].ReadValue();
+                    string afterImage = info["afterImage"] == null ? "" : info["afterImage"].ReadString("");
+                    string sfx = info["sfx"] == null ? "" : info["sfx"].ReadString("");
+                    int head = info["head"] == null ? 0 : info["head"].ReadValue();
+                    int knockback = info["knockback"] == null ? 0 : info["knockback"].ReadValue();
+                    int damR = info["damR"] == null ? 0 : info["damR"].ReadValue();
+                    int icnSTR = info["icnSTR"] == null ? 0 : info["icnSTR"].ReadValue();
+                    int cantRepair = info["cantRepair"] == null ? 0 : info["cantRepair"].ReadValue();
+                    int gatherTool = info["gatherTool"] == null ? 0 : info["gatherTool"].ReadValue();
+                    int additon = info["additon"] == null ? 0 : info["additon"].ReadValue();
+                    int elemDefault = info["elemDefault"] == null ? 0 : info["elemDefault"].ReadValue();
+                    int incRMAI = info["incRMAI"] == null ? 0 : info["incRMAI"].ReadValue();
+                    int incRMAL = info["incRMAL"] == null ? 0 : info["incRMAL"].ReadValue();
+                    int incRMAF = info["incRMAF"] == null ? 0 : info["incRMAF"].ReadValue();
+                    int incRMAS = info["incRMAS"] == null ? 0 : info["incRMAS"].ReadValue();
+                    int epic = info["epic"] == null ? 0 : info["epic"].ReadValue();
+                    int hide = info["hide"] == null ? 0 : info["hide"].ReadValue();
+                    int kaiserOffsetX = info["kaiserOffsetX"] == null ? 0 : info["kaiserOffsetX"].ReadValue();
+                    int kaiserOffsetY = info["kaiserOffsetY"] == null ? 0 : info["kaiserOffsetY"].ReadValue();
+                    int inPAD = info["inPAD"] == null ? 0 : info["inPAD"].ReadValue();
+                    int incLuk = info["incLuk"] == null ? 0 : info["incLuk"].ReadValue();
+                    int incAttackCount = info["incAttackCount"] == null ? 0 : info["incAttackCount"].ReadValue();
+
+                    JSON += "\"setItemID\":\"" + setItemID + "\",";
+                    JSON += "\"tuc\":\"" + tuc + "\",";
+                    JSON += "\"price\":\"" + price + "\",";
+                    JSON += "\"notSale\":\"" + notSale + "\",";
+                    JSON += "\"only\":\"" + only + "\",";
+                    JSON += "\"tradeBlock\":\"" + tradeBlock + "\",";
+                    JSON += "\"onlyEquip\":\"" + onlyEquip + "\",";
+                    JSON += "\"addition\":\"" + addition + "\",";
+                    JSON += "\"incPDD\":\"" + incPDD + "\",";
+                    JSON += "\"incMDD\":\"" + incMDD + "\",";
+                    JSON += "\"incPAD\":\"" + incPAD + "\",";
+                    JSON += "\"incMAD\":\"" + incMAD + "\",";
+                    JSON += "\"incSTR\":\"" + incSTR + "\",";
+                    JSON += "\"incINT\":\"" + incINT + "\",";
+                    JSON += "\"incDEX\":\"" + incDEX + "\",";
+                    JSON += "\"incLUK\":\"" + incLUK + "\",";
+                    JSON += "\"superiorEqp\":\"" + superiorEqp + "\",";
+                    JSON += "\"tradeAvailable\":\"" + tradeAvailable + "\",";
+                    JSON += "\"exItem\":\"" + exItem + "\",";
+                    JSON += "\"incMHP\":\"" + incMHP + "\",";
+                    JSON += "\"incMMP\":\"" + incMMP + "\",";
+                    JSON += "\"medalTag\":\"" + medalTag + "\",";
+                    JSON += "\"incACC\":\"" + incACC + "\",";
+                    JSON += "\"incEVA\":\"" + incEVA + "\",";
+                    JSON += "\"timeLimited\":\"" + timeLimited + "\",";
+                    JSON += "\"incSpeed\":\"" + incSpeed + "\",";
+                    JSON += "\"fixedPotential\":\"" + fixedPotential + "\",";
+                    JSON += "\"fixedGrade\":\"" + fixedGrade + "\",";
+                    JSON += "\"specialGrade\":\"" + specialGrade + "\",";
+                    JSON += "\"option\":\"" + option + "\",";
+                    JSON += "\"charismaEXP\":\"" + charismaEXP + "\",";
+                    JSON += "\"charmEXP\":\"" + charmEXP + "\",";
+                    JSON += "\"willEXP\":\"" + willEXP + "\",";
+                    JSON += "\"notExtend\":\"" + notExtend + "\",";
+                    JSON += "\"exGrade\":\"" + exGrade + "\",";
+                    JSON += "\"level\":\"" + level + "\",";
+                    JSON += "\"incJump\":\"" + incJump + "\",";
+                    JSON += "\"bossReward\":\"" + bossReward + "\",";
+                    JSON += "\"sharableOnce\":\"" + sharableOnce + "\",";
+                    JSON += "\"accountSharable\":\"" + accountSharable + "\",";
+                    JSON += "\"baseLevel\":\"" + baseLevel + "\",";
+                    JSON += "\"abilityTimeLimited\":\"" + abilityTimeLimited + "\",";
+                    JSON += "\"incMHPr\":\"" + incMHPr + "\",";
+                    JSON += "\"incMMPr\":\"" + incMMPr + "\",";
+                    JSON += "\"equipTradeBlock\":\"" + equipTradeBlock + "\",";
+                    JSON += "\"bonusExp\":\"" + bonusExp + "\",";
+                    JSON += "\"reduceReq\":\"" + reduceReq + "\",";
+                    JSON += "\"incCraft\":\"" + incCraft + "\",";
+                    JSON += "\"scope\":\"" + scope + "\",";
+                    JSON += "\"accountShareTag\":\"" + accountShareTag + "\",";
+                    JSON += "\"bdR\":\"" + bdR + "\",";
+                    JSON += "\"imdR\":\"" + imdR + "\",";
+                    JSON += "\"noPotential\":\"" + noPotential + "\",";
+                    JSON += "\"dayOfWeekItemStat\":\"" + dayOfWeekItemStat + "\",";
+                    JSON += "\"slotMax\":\"" + slotMax + "\",";
+                    JSON += "\"noExpend\":\"" + noExpend + "\",";
+                    JSON += "\"specialID\":\"" + specialID + "\",";
+                    JSON += "\"invisibleFace\":\"" + invisibleFace + "\",";
+                    JSON += "\"noMoveToLocker\":\"" + noMoveToLocker + "\",";
+                    JSON += "\"cashForceCharmExp\":\"" + cashForceCharmExp + "\",";
+                    JSON += "\"reqPOP\":\"" + reqPOP + "\",";
+                    JSON += "\"attackSpeed\":\"" + attackSpeed + "\",";
+                    JSON += "\"TimeLimited\":\"" + TimeLimited + "\",";
+                    JSON += "\"reqSpecJob\":\"" + reqSpecJob + "\",";
+                    JSON += "\"durability\":\"" + durability + "\",";
+                    JSON += "\"replace\":\"" + replace + "\",";
+                    JSON += "\"insightEXP\":\"" + insightEXP + "\",";
+                    JSON += "\"onlyUpgrade\":\"" + onlyUpgrade + "\",";
+                    JSON += "\"epicItem\":\"" + epicItem + "\",";
+                    JSON += "\"exceptUpgrade\":\"" + exceptUpgrade + "\",";
+                    JSON += "\"exceptToadsHammer\":\"" + exceptToadsHammer + "\",";
+                    JSON += "\"exceptTransmission\":\"" + exceptTransmission + "\",";
+                    JSON += "\"equipDrop\":\"" + equipDrop + "\",";
+                    JSON += "\"blockGoldHammer\":\"" + blockGoldHammer + "\",";
+                    JSON += "\"bdr\":\"" + bdr + "\",";
+                    JSON += "\"senseEXP\":\"" + senseEXP + "\",";
+                    JSON += "\"craftEXP\":\"" + craftEXP + "\",";
+                    JSON += "\"StarPlanet\":\"" + StarPlanet + "\",";
+                    JSON += "\"jewelCraft\":\"" + jewelCraft + "\",";
+                    JSON += "\"effect\":\"" + effect + "\",";
+                    JSON += "\"tradBlock\":\"" + tradBlock + "\",";
+                    JSON += "\"MaxHP\":\"" + MaxHP + "\",";
+                    JSON += "\"PotionDiscount\":\"" + PotionDiscount + "\",";
+                    JSON += "\"cubeExBaseOptionLevel\":\"" + cubeExBaseOptionLevel + "\",";
+                    JSON += "\"bonusDrop\":\"" + bonusDrop + "\",";
+                    JSON += "\"incCriticalMAXDamage\":\"" + incCriticalMAXDamage + "\",";
+                    JSON += "\"expireOnLogout\":\"" + expireOnLogout + "\",";
+                    JSON += "\"jokerToSetItem\":\"" + jokerToSetItem + "\",";
+                    JSON += "\"speed\":\"" + speed + "\",";
+                    JSON += "\"dropBlock\":\"" + dropBlock + "\",";
+                    JSON += "\"incPVPDamage\":\"" + incPVPDamage + "\",";
+                    JSON += "\"randVariation\":\"" + randVariation + "\",";
+                    JSON += "\"incPDDr\":\"" + incPDDr + "\",";
+                    JSON += "\"incMDDr\":\"" + incMDDr + "\",";
+                    JSON += "\"incDAMr\":\"" + incDAMr + "\",";
+                    JSON += "\"night\":\"" + night + "\",";
+                    JSON += "\"CuttableCount\":\"" + CuttableCount + "\",";
+                    JSON += "\"equippedEmotion\":\"" + equippedEmotion + "\",";
+                    JSON += "\"equippedSound\":\"" + equippedSound + "\",";
+                    JSON += "\"PDD\":\"" + PDD + "\",";
+                    JSON += "\"noDrop\":\"" + noDrop + "\",";
+                    JSON += "\"incCr\":\"" + incCr + "\",";
+                    JSON += "\"android\":\"" + android + "\",";
+                    JSON += "\"grade\":\"" + grade + "\",";
+                    JSON += "\"androidKey\":\"" + androidKey + "\",";
+                    JSON += "\"mulVestigeCount\":\"" + mulVestigeCount + "\",";
+                    JSON += "\"incARC\":\"" + incARC + "\",";
+                    JSON += "\"scanTradeBlock\":\"" + scanTradeBlock + "\",";
+                    JSON += "\"reqQuestOnProgress\":\"" + reqQuestOnProgress + "\",";
+                    JSON += "\"bitsSlot\":\"" + bitsSlot + "\",";
+                    JSON += "\"royalSpecial\":\"" + royalSpecial + "\",";
+                    JSON += "\"effectItemID\":\"" + effectItemID + "\",";
+                    JSON += "\"reqJob2\":\"" + reqJob2 + "\",";
+                    JSON += "\"origin\":\"" + origin + "\",";
+                    JSON += "\"quest\":\"" + quest + "\",";
+                    JSON += "\"enchantCategory\":\"" + enchantCategory + "\",";
+                    JSON += "\"IUCMax\":\"" + IUCMax + "\",";
+                    JSON += "\"transform\":\"" + transform + "\",";
+                    JSON += "\"weekly\":\"" + weekly + "\",";
+                    JSON += "\"masterSpecial\":\"" + masterSpecial + "\",";
+                    JSON += "\"keywordEffect\":\"" + keywordEffect + "\",";
+                    JSON += "\"extendFrame\":\"" + extendFrame + "\",";
+                    JSON += "\"vehicleDefaultFrame\":\"" + vehicleDefaultFrame + "\",";
+                    JSON += "\"cashTradeBlock\":\"" + cashTradeBlock + "\",";
+                    JSON += "\"onlyCash\":\"" + onlyCash + "\",";
+                    JSON += "\"sample\":\"" + sample + "\",";
+                    JSON += "\"lookChangeType\":\"" + lookChangeType + "\",";
+                    JSON += "\"isAbleToTradeOnce\":\"" + isAbleToTradeOnce + "\",";
+                    JSON += "\"incHP\":\"" + incHP + "\",";
+                    JSON += "\"acc\":\"" + acc + "\",";
+                    JSON += "\"pachinko\":\"" + pachinko + "\",";
+                    JSON += "\"noExtend\":\"" + noExtend + "\",";
+                    JSON += "\"addtion\":\"" + addtion + "\",";
+                    JSON += "\"groupEffectID\":\"" + groupEffectID + "\",";
+                    JSON += "\"variableStat\":\"" + variableStat + "\",";
+                    JSON += "\"undecomposable\":\"" + undecomposable + "\",";
+                    JSON += "\"despair\":\"" + despair + "\",";
+                    JSON += "\"love\":\"" + love + "\",";
+                    JSON += "\"shine\":\"" + shine + "\",";
+                    JSON += "\"blaze\":\"" + blaze + "\",";
+                    JSON += "\"hum\":\"" + hum + "\",";
+                    JSON += "\"bowing\":\"" + bowing + "\",";
+                    JSON += "\"hot\":\"" + hot + "\",";
+                    JSON += "\"range\":\"" + range + "\",";
+                    JSON += "\"skill\":\"" + skill + "\",";
+                    JSON += "\"pad\":\"" + pad + "\",";
+                    JSON += "\"FAttribute\":\"" + FAttribute + "\",";
+                    JSON += "\"FCategory\":\"" + FCategory + "\",";
+                    JSON += "\"MobID\":\"" + MobID + "\",";
+                    JSON += "\"mob\":\"" + mob + "\",";
+                    JSON += "\"noPotentialFieldtype\":\"" + noPotentialFieldtype + "\",";
+                    JSON += "\"incLUk\":\"" + incLUk + "\",";
+                    JSON += "\"recovery\":\"" + recovery + "\",";
+                    JSON += "\"linkedPairItem\":\"" + linkedPairItem + "\",";
+                    JSON += "\"pickUpBlock\":\"" + pickUpBlock + "\",";
+                    JSON += "\"pickupMeso\":\"" + pickupMeso + "\",";
+                    JSON += "\"pickupItem\":\"" + pickupItem + "\",";
+                    JSON += "\"pickupOthers\":\"" + pickupOthers + "\",";
+                    JSON += "\"sweepForDrop\":\"" + sweepForDrop + "\",";
+                    JSON += "\"longRange\":\"" + longRange + "\",";
+                    JSON += "\"consumeMP\":\"" + consumeMP + "\",";
+                    JSON += "\"ignorePickup\":\"" + ignorePickup + "\",";
+                    JSON += "\"autoBuff\":\"" + autoBuff + "\",";
+                    JSON += "\"consumeHP\":\"" + consumeHP + "\",";
+                    JSON += "\"text\":\"" + text + "\",";
+                    JSON += "\"textColor\":\"" + textColor + "\",";
+                    JSON += "\"textOffsetX\":\"" + textOffsetX + "\",";
+                    JSON += "\"textOffsetY\":\"" + textOffsetY + "\",";
+                    JSON += "\"textFontSize\":\"" + textFontSize + "\",";
+                    JSON += "\"textAreaX\":\"" + textAreaX + "\",";
+                    JSON += "\"textAreaY\":\"" + textAreaY + "\",";
+                    JSON += "\"consumeCure\":\"" + consumeCure + "\",";
+                    JSON += "\"smartPet\":\"" + smartPet + "\",";
+                    JSON += "\"ringOptionSkill\":\"" + ringOptionSkill + "\",";
+                    JSON += "\"ringOptionSkillLv\":\"" + ringOptionSkillLv + "\",";
+                    JSON += "\"chatBalloon\":\"" + chatBalloon + "\",";
+                    JSON += "\"nameTag\":\"" + nameTag + "\",";
+                    JSON += "\"tradeblock\":\"" + tradeblock + "\",";
+                    JSON += "\"TradeBlock\":\"" + TradeBlock + "\",";
+                    JSON += "\"expBuff\":\"" + expBuff + "\",";
+                    JSON += "\"expRate\":\"" + expRate + "\",";
+                    JSON += "\"reqRace\":\"" + reqRace + "\",";
+                    JSON += "\"bloodAllianceExpRate\":\"" + bloodAllianceExpRate + "\",";
+                    JSON += "\"bloodAlliancePartyExpRate\":\"" + bloodAlliancePartyExpRate + "\",";
+                    JSON += "\"unchangeable\":\"" + unchangeable + "\",";
+                    JSON += "\"pmdR\":\"" + pmdR + "\",";
+                    JSON += "\"hitDamRatePlus\":\"" + hitDamRatePlus + "\",";
+                    JSON += "\"fs\":\"" + fs + "\",";
+                    JSON += "\"tamingMob\":\"" + tamingMob + "\",";
+                    JSON += "\"vehicleSkillIsTown\":\"" + vehicleSkillIsTown + "\",";
+                    JSON += "\"vehicleDoubleJumpLevel\":\"" + vehicleDoubleJumpLevel + "\",";
+                    JSON += "\"incSwim\":\"" + incSwim + "\",";
+                    JSON += "\"incFatigue\":\"" + incFatigue + "\",";
+                    JSON += "\"hpRecovery\":\"" + hpRecovery + "\",";
+                    JSON += "\"mpRecovery\":\"" + mpRecovery + "\",";
+                    JSON += "\"vehicleNaviFlyingLevel\":\"" + vehicleNaviFlyingLevel + "\",";
+                    JSON += "\"removeBody\":\"" + removeBody + "\",";
+                    JSON += "\"vehicleGlideLevel\":\"" + vehicleGlideLevel + "\",";
+                    JSON += "\"vehicleNewFlyingLevel\":\"" + vehicleNewFlyingLevel + "\",";
+                    JSON += "\"ActionEffect\":\"" + ActionEffect + "\",";
+                    JSON += "\"dx\":\"" + dx + "\",";
+                    JSON += "\"dy\":\"" + dy + "\",";
+                    JSON += "\"partsQuestID\":\"" + partsQuestID + "\",";
+                    JSON += "\"partsCount\":\"" + partsCount + "\",";
+                    JSON += "\"customVehicle\":\"" + customVehicle + "\",";
+                    JSON += "\"passengerNum\":\"" + passengerNum + "\",";
+                    JSON += "\"flip\":\"" + flip + "\",";
+                    JSON += "\"walk\":\"" + walk + "\",";
+                    JSON += "\"stand\":\"" + stand + "\",";
+                    JSON += "\"attack\":\"" + attack + "\",";
+                    JSON += "\"afterImage\":\"" + afterImage + "\",";
+                    JSON += "\"sfx\":\"" + sfx + "\",";
+                    JSON += "\"head\":\"" + head + "\",";
+                    JSON += "\"knockback\":\"" + knockback + "\",";
+                    JSON += "\"damR\":\"" + damR + "\",";
+                    JSON += "\"icnSTR\":\"" + icnSTR + "\",";
+                    JSON += "\"cantRepair\":\"" + cantRepair + "\",";
+                    JSON += "\"gatherTool\":\"" + gatherTool + "\",";
+                    JSON += "\"additon\":\"" + additon + "\",";
+                    JSON += "\"elemDefault\":\"" + elemDefault + "\",";
+                    JSON += "\"incRMAI\":\"" + incRMAI + "\",";
+                    JSON += "\"incRMAL\":\"" + incRMAL + "\",";
+                    JSON += "\"incRMAF\":\"" + incRMAF + "\",";
+                    JSON += "\"incRMAS\":\"" + incRMAS + "\",";
+                    JSON += "\"epic\":\"" + epic + "\",";
+                    JSON += "\"hide\":\"" + hide + "\",";
+                    JSON += "\"kaiserOffsetX\":\"" + kaiserOffsetX + "\",";
+                    JSON += "\"kaiserOffsetY\":\"" + kaiserOffsetY + "\",";
+                    JSON += "\"inPAD\":\"" + inPAD + "\",";
+                    JSON += "\"incLuk\":\"" + incLuk + "\",";
+                    JSON += "\"incAttackCount\":\"" + incAttackCount + "\",";
+
+                    using (TextWriter tw = new StreamWriter(File.Create(path + item.name.Replace(".img", "") + ".json")))
+                    {
+                        tw.Write(JSON.Substring(0, JSON.Length - 1) + "}");
+                    }
+
+                    //Generating list of possible values.
+                    foreach (WzImageProperty prop in info.properties)
+                    {
+
+                        try
+                        {
+                            props.Add(prop.Name);
+                        }
+                        catch (Exception ex)
+                        {
+                            //Canvas properties fail to cast
+                        }
+                    }
+                }
+            }
+
+            String ret = "";
+            foreach (string prop in props)
+            {
+                ret += prop + "\r\n";
+            }
+
+            using (TextWriter tw = new StreamWriter(File.Create(path + "props.txt")))
+            {
+                tw.Write(ret);
+            }
+        }
+
+        private void StringToJSON(WzDirectory dir, string path)
+        {
+            //Items
+            WzImage Cash = (WzImage)dir["Cash.img"];
+            WzImage Consume = (WzImage)dir["Consume.img"];
+            WzImage Ins = (WzImage)dir["Ins.img"];
+            WzImage Pet = (WzImage)dir["Pet.img"];
+            WzImage Etc = (WzImage)dir["Etc.img"];
+            WzImage Eqp = (WzImage)dir["Eqp.img"];
+
+            if (!Directory.Exists(path + @"\item\"))
+            {
+                Directory.CreateDirectory(path + @"\item\");
+            }
+
+            foreach (WzSubProperty item in Cash.WzProperties)
+            {
+                String JSON = "{";
+                JSON += "\"id\": " + item.name + ",";
+                JSON += "\"type\": \"Cash\",";
+                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " ") + "\",";
+                JSON += "\"desc\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
+                using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + item.name + ".json")))
+                {
+                    tw.Write(JSON);
+                }
+            }
+
+            foreach (WzSubProperty item in Consume.WzProperties)
+            {
+                String JSON = "{";
+                JSON += "\"id\": " + item.name + ",";
+                JSON += "\"type\": \"Consume\",";
+                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " ") + "\",";
+                JSON += "\"desc\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
+                using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + item.name + ".json")))
+                {
+                    tw.Write(JSON);
+                }
+            }
+
+            foreach (WzSubProperty item in Ins.WzProperties)
+            {
+                String JSON = "{";
+                JSON += "\"id\": " + item.name + ",";
+                JSON += "\"type\": \"Setup\",";
+                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " ") + "\",";
+                JSON += "\"desc\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
+                using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + item.name + ".json")))
+                {
+                    tw.Write(JSON);
+                }
+            }
+
+            foreach (WzSubProperty item in Pet.WzProperties)
+            {
+                String JSON = "{";
+                JSON += "\"id\": " + item.name + ",";
+                JSON += "\"type\": \"Pet\",";
+                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " ") + "\",";
+                JSON += "\"desc\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
+                using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + item.name + ".json")))
+                {
+                    tw.Write(JSON);
+                }
+            }
+
+            foreach (WzSubProperty item in Etc["Etc"].WzProperties)
+            {
+                String JSON = "{";
+                JSON += "\"id\": " + item.name + ",";
+                JSON += "\"type\": \"Etc\",";
+                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " ") + "\",";
+                JSON += "\"desc\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
+                using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + item.name + ".json")))
+                {
+                    tw.Write(JSON);
+                }
+            }
+
+
+            foreach (WzSubProperty cat in Eqp.WzProperties)
+            {
+                foreach (WzSubProperty item in cat.WzProperties)
+                {
+                    String JSON = "{";
+                    JSON += "\"id\": " + item.name + ",";
+                    JSON += "\"type\": \"Equip\",";
+                    JSON += "\"category\": \"" + cat.name + "\",";
+                    JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " ") + "\",";
+                    JSON += "\"desc\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
+                    using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + item.name + ".json")))
+                    {
+                        tw.Write(JSON);
+                    }
+                }
+            }
+
+            if (!Directory.Exists(path + @"\npc\"))
+            {
+                Directory.CreateDirectory(path + @"\npc\");
+            }
+
+            //Npc
+            WzImage Npc = (WzImage)dir["Npc.img"];
+            foreach (WzSubProperty npc in Npc.WzProperties)
+            {
+                String JSON = "{";
+                JSON += "\"id\": " + npc.name + ",";
+                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(npc["name"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
+                using (TextWriter tw = new StreamWriter(File.Create(path + @"\npc\" + npc.name + ".json")))
+                {
+                    tw.Write(JSON);
+                }
+            }
+
+            if (!Directory.Exists(path + @"\mob\"))
+            {
+                Directory.CreateDirectory(path + @"\mob\");
+            }
+
+            //Mob
+            WzImage Mob = (WzImage)dir["Mob.img"];
+            foreach (WzSubProperty mob in Mob.WzProperties)
+            {
+                String JSON = "{";
+                JSON += "\"id\": " + mob.name + ",";
+                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(mob["name"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
+                using (TextWriter tw = new StreamWriter(File.Create(path + @"\mob\" + mob.name + ".json")))
+                {
+                    tw.Write(JSON);
+                }
+            }
+
+            if (!Directory.Exists(path + @"\map\"))
+            {
+                Directory.CreateDirectory(path + @"\map\");
+            }
+
+            //Map
+            WzImage Map = (WzImage)dir["Map.img"];
+            foreach (WzSubProperty cat in Map.WzProperties)
+            {
+                foreach (WzSubProperty map in cat.WzProperties)
+                {
+                    String JSON = "{";
+                    JSON += "{\"id\": " + map.name + ",";
+                    JSON += "\"type\": \"" + cat.name + "\",";
+                    JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(map["mapName"].ReadString("")), @"\r\n?|\n", " ") + "\",";
+                    JSON += "\"street\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(map["streetName"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
+                    using (TextWriter tw = new StreamWriter(File.Create(path + @"\map\" + map.name + ".json")))
+                    {
+                        tw.Write(JSON);
+                    }
+                }
+            }
+
+            if (!Directory.Exists(path + @"\skill\"))
+            {
+                Directory.CreateDirectory(path + @"\skill\");
+            }
+
+            //Skill
+            WzImage Skill = (WzImage)dir["Skill.img"];
+            foreach (WzSubProperty skill in Skill.WzProperties)
+            {
+                String JSON = "{";
+                if (skill["bookName"] != null) continue;
+                JSON += "{\"id\": " + skill.name + ",";
+                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(skill["name"].ReadString("")), @"\r\n?|\n", " ") + "\",";
+                JSON += "\"desc\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(skill["desc"].ReadString("")), @"\r\n?|\n", " ") + "\"},";
+                using (TextWriter tw = new StreamWriter(File.Create(path + @"\skill\" + skill.name + ".json")))
+                {
+                    tw.Write(JSON);
+                }
+            }
+        }
+
+        private void ItemToJSON(WzDirectory dir, string path)
+        {
+            WzDirectory Cash = (WzDirectory)dir["Cash"];
+            WzDirectory Consume = (WzDirectory)dir["Consume"];
+            WzDirectory Etc = (WzDirectory)dir["Etc"];
+            WzDirectory Install = (WzDirectory)dir["Install"];
+            WzDirectory Pet = (WzDirectory)dir["Pet"];
+            WzDirectory Special = (WzDirectory)dir["Cash"];
+
+            ItemCategoryToJSON(Cash, path);
+            ItemCategoryToJSON(Consume, path);
+            ItemCategoryToJSON(Etc, path);
+            ItemCategoryToJSON(Install, path);
+            ItemCategoryToJSON(Pet, path);
+            ItemCategoryToJSON(Special, path);
+        }
+
+        private void ItemCategoryToJSON(WzDirectory type, string path)
+        {
+            try
+            {
+                foreach (WzImage itemCat in type.WzImages)
+                {
+                    foreach (WzSubProperty item in itemCat.WzProperties)
+                    {
+                        WzSubProperty info = (WzSubProperty)item["info"];
+                        WzSubProperty spec = (WzSubProperty)item["spec"];
+
+                        if (info == null)
+                        {
+                            continue;
+                        }
+
+                        using (TextWriter tw = new StreamWriter(File.Create(path + item.name + ".json")))
+                        {
+                            //Get Icon
+                            MemoryStream stream = new MemoryStream();
+                            if (info["icon"] != null)
+                            {
+                                if (info["icon"].PropertyType == WzPropertyType.Canvas)
+                                {
+                                    WzCanvasProperty img = (WzCanvasProperty)info["icon"];
+                                    if (img == null) continue;
+                                    img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                                }
+                                else if (info["icon"].PropertyType == WzPropertyType.UOL)
+                                {
+                                    WzUOLProperty uol = (WzUOLProperty)info["icon"];
+                                    WzCanvasProperty img = (WzCanvasProperty)uol.LinkValue;
+                                    if (img == null) continue;
+                                    img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                                }
+                            }
+
+                            byte[] pngbytes = stream.ToArray();
+                            stream.Close();
+
+                            //Get price
+                            int price = info["price"] == null ? 0 : info["price"].ReadValue();
+
+                            //Get SlotMax
+                            int slotMax = info["slotMax"] == null ? 1 : info["slotMax"].ReadValue();
+
+                            //Get cash
+                            int isCash = info["cash"] == null ? 0 : info["cash"].ReadValue();
+
+                            //Get tradeblock
+                            int tradeBlock = info["tradeBlock"] == null ? 0 : info["tradeBlock"].ReadValue();
+
+                            string JSON = "";
+                            JSON += "{";
+                            JSON += "\"price\":" + price + ",";
+                            JSON += "\"slotMax\":" + slotMax + ",";
+                            JSON += "\"cash\":" + isCash + ",";
+                            JSON += "\"tradeBlock\":" + tradeBlock + ",";
+                            JSON += "\"icon\":\"" + Convert.ToBase64String(pngbytes) + "\",";
+                            JSON += "\"spec\":[";
+
+                            if (spec != null)
+                            {
+                                try
+                                {
+                                    foreach (WzSubProperty effect in spec.WzProperties)
+                                    {
+                                        if (effect.PropertyType == WzPropertyType.String)
+                                        {
+                                            JSON += "{\"name\":\"" + effect.name + "\", \"value\":\"" + effect.ReadString("") + "\"},";
+                                        }
+                                        else
+                                        {
+                                            JSON += "{\"name\":\"" + effect.name + "\", \"value\":" + effect.ReadValue() + "},";
+                                        }
+                                    }
+                                    JSON = JSON.Substring(0, JSON.Length - 1);
+                                }
+                                catch (Exception ex)
+                                {
+
+                                }
+                            }
+                            JSON += "]}";
+                            tw.Write(JSON);
+                        }
+
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Error: " + type.name, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+    }
+
+
 
     public class WzClassicXmlSerializer : WzXmlSerializer, IWzImageSerializer
     {

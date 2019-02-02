@@ -88,6 +88,7 @@ namespace HaRepacker.GUI
             this.animateToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripMenuItem_searchWzStrings = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripMenuItem_WzEncryption = new System.Windows.Forms.ToolStripMenuItem();
+            this.dumpJSONAPIToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.encryptionBox = new System.Windows.Forms.ToolStripComboBox();
             this.helpToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.viewHelpToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -335,6 +336,7 @@ namespace HaRepacker.GUI
             this.exportFilesToXMLToolStripMenuItem.Image = global::HaRepacker.Properties.Resources.folder_go;
             this.exportFilesToXMLToolStripMenuItem.Name = "exportFilesToXMLToolStripMenuItem";
             resources.ApplyResources(this.exportFilesToXMLToolStripMenuItem, "exportFilesToXMLToolStripMenuItem");
+            this.exportFilesToXMLToolStripMenuItem.Click += new System.EventHandler(this.exportFilesToXMLToolStripMenuItem_Click);
             // 
             // xMLToolStripMenuItem
             // 
@@ -455,7 +457,8 @@ namespace HaRepacker.GUI
             this.fHMappingToolStripMenuItem,
             this.animateToolStripMenuItem,
             this.toolStripMenuItem_searchWzStrings,
-            this.toolStripMenuItem_WzEncryption});
+            this.toolStripMenuItem_WzEncryption,
+            this.dumpJSONAPIToolStripMenuItem});
             this.extrasToolStripMenuItem.Name = "extrasToolStripMenuItem";
             resources.ApplyResources(this.extrasToolStripMenuItem, "extrasToolStripMenuItem");
             // 
@@ -505,6 +508,12 @@ namespace HaRepacker.GUI
             this.toolStripMenuItem_WzEncryption.Name = "toolStripMenuItem_WzEncryption";
             resources.ApplyResources(this.toolStripMenuItem_WzEncryption, "toolStripMenuItem_WzEncryption");
             this.toolStripMenuItem_WzEncryption.Click += new System.EventHandler(this.toolStripMenuItem_WzEncryption_Click);
+            // 
+            // dumpJSONAPIToolStripMenuItem
+            // 
+            this.dumpJSONAPIToolStripMenuItem.Name = "dumpJSONAPIToolStripMenuItem";
+            resources.ApplyResources(this.dumpJSONAPIToolStripMenuItem, "dumpJSONAPIToolStripMenuItem");
+            this.dumpJSONAPIToolStripMenuItem.Click += new System.EventHandler(this.dumpJSONAPIToolStripMenuItem_Click);
             // 
             // encryptionBox
             // 
@@ -649,6 +658,7 @@ namespace HaRepacker.GUI
         private System.Windows.Forms.ToolStripMenuItem wzLongPropertyToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem toolStripMenuItem_searchWzStrings;
         private System.Windows.Forms.ToolStripMenuItem toolStripMenuItem_WzEncryption;
+        private System.Windows.Forms.ToolStripMenuItem dumpJSONAPIToolStripMenuItem;
     }
 }
 

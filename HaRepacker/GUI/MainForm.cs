@@ -720,6 +720,39 @@ namespace HaRepacker.GUI
             MainPanel.PromptRemoveSelectedTreeNodes();
         }
 
+        private void RunWzFilesExtractionToJSON(object param)
+        {
+            ChangeApplicationState(false);
+
+            string[] wzFilesToDump = (string[])((object[])param)[0];
+            string baseDir = (string)((object[])param)[1];
+            WzMapleVersion version = (WzMapleVersion)((object[])param)[2];
+            IWzFileSerializer serializer = (IWzFileSerializer)((object[])param)[3];
+            UpdateProgressBar(MainPanel.mainProgressBar, 0, false, true);
+            UpdateProgressBar(MainPanel.mainProgressBar, wzFilesToDump.Length, true, true);
+
+            if (!Directory.Exists(baseDir))
+            {
+                Directory.CreateDirectory(baseDir);
+            }
+
+            foreach (string wzpath in wzFilesToDump)
+            {
+                if (WzTool.IsListFile(wzpath) || WzTool.IsDataWzHotfixFile(wzpath))
+                {
+                    continue;
+                }
+                
+                WzFile wzFile = new WzFile(wzpath, version);
+                wzFile.ParseWzFile();
+                serializer.SerializeFile(wzFile, Path.Combine(baseDir, wzFile.Name));
+                Warning.Error(wzFile.Name);
+                wzFile.Dispose();
+                UpdateProgressBar(MainPanel.mainProgressBar, 1, false, false);
+            }
+            threadDone = true;
+        }
+
         private void RunWzFilesExtraction(object param)
         {
             ChangeApplicationState(false);
@@ -839,16 +872,44 @@ namespace HaRepacker.GUI
 
             if (dialog.ShowDialog() != DialogResult.OK)
                 return;
+
             FolderBrowserDialog folderDialog = new FolderBrowserDialog()
             {
                 Description = HaRepacker.Properties.Resources.SelectOutDir
             };
+
             if (folderDialog.ShowDialog() != DialogResult.OK)
                 return;
 
             WzClassicXmlSerializer serializer = new WzClassicXmlSerializer(
                 Program.ConfigurationManager.UserSettings.Indentation,
                 Program.ConfigurationManager.UserSettings.LineBreakType, false);
+            threadDone = false;
+            new Thread(new ParameterizedThreadStart(RunWzFilesExtraction)).Start((object)new object[] { dialog.FileNames, folderDialog.SelectedPath, encryptionBox.SelectedIndex, serializer });
+            new Thread(new ParameterizedThreadStart(ProgressBarThread)).Start(serializer);
+        }
+
+        private void dumpJSONAPIToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog dialog = new OpenFileDialog()
+            {
+                Title = HaRepacker.Properties.Resources.SelectWz,
+                Filter = string.Format("{0}|*.wz", HaRepacker.Properties.Resources.WzFilter),
+                Multiselect = true
+            };
+
+            if (dialog.ShowDialog() != DialogResult.OK)
+                return;
+
+            FolderBrowserDialog folderDialog = new FolderBrowserDialog()
+            {
+                Description = HaRepacker.Properties.Resources.SelectOutDir
+            };
+
+            if (folderDialog.ShowDialog() != DialogResult.OK)
+                return;
+
+            WzJSONSerializer serializer = new WzJSONSerializer();
             threadDone = false;
             new Thread(new ParameterizedThreadStart(RunWzFilesExtraction)).Start((object)new object[] { dialog.FileNames, folderDialog.SelectedPath, encryptionBox.SelectedIndex, serializer });
             new Thread(new ParameterizedThreadStart(ProgressBarThread)).Start(serializer);
@@ -1559,6 +1620,11 @@ namespace HaRepacker.GUI
         private void pasteToolStripMenuItem_Click(object sender, EventArgs e)
         {
             MainPanel.DoPaste();
+        }
+
+        private void exportFilesToXMLToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }
