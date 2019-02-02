@@ -483,6 +483,9 @@ namespace MapleLib.WzLib.Serialization
                 case "Mob2.wz":
                     MobToJSON(dir, path);
                     break;
+                case "Map.wz":
+                    //MapToJSON(dir, path);
+                    break;
             }
         }
 
@@ -499,12 +502,12 @@ namespace MapleLib.WzLib.Serialization
 
         private void MobToJSON(WzDirectory dir, string path)
         {
-            foreach (WzDirectory mob in dir.subDirs)
+            foreach (WzImage mob in dir.WzImages)
             {
                 WzSubProperty info = (WzSubProperty)mob["info"];
 
                 string icon = "";
-                string link = "";
+                string link = "0";
 
                 //Resolve icon
                 if (info["link"] != null) //Link has no icon
@@ -532,7 +535,7 @@ namespace MapleLib.WzLib.Serialization
 
                         byte[] pngbytes = stream.ToArray();
                         stream.Close();
-                        icon += Convert.ToBase64String(pngbytes);
+                        icon = Convert.ToBase64String(pngbytes);
                     }
                     else if (info["stand"] != null && info["stand"]["0"] != null)
                     {
@@ -553,7 +556,7 @@ namespace MapleLib.WzLib.Serialization
 
                         byte[] pngbytes = stream.ToArray();
                         stream.Close();
-                        icon += Convert.ToBase64String(pngbytes);
+                        icon = Convert.ToBase64String(pngbytes);
                     }
                 }
 
@@ -607,10 +610,17 @@ namespace MapleLib.WzLib.Serialization
                 string revive = "[";
                 if (info["revive"] != null)
                 {
-                    foreach (WzSubProperty spawn in info["revive"].WzProperties)
+                    info["revive"].WzProperties.ForEach(elem => 
                     {
-                        revive += spawn.ReadValue() + ",";
-                    }
+                        if (elem.PropertyType == WzPropertyType.String)
+                        {
+                            revive += ((WzStringProperty)elem).ReadString("") + ","; 
+                        }
+                        else
+                        {
+                            revive += elem.ReadValue() + ",";
+                        }
+                    });
                     revive = revive.Substring(0, revive.Length - 1);
                 }
                 revive += "]";
@@ -621,11 +631,74 @@ namespace MapleLib.WzLib.Serialization
                 {
                     foreach (WzSubProperty skill in info["skill"].WzProperties)
                     {
-                        skills += skill.ReadValue() + ",";
+                        skills += "{";
+                        skills += "\"action\":" + skill["action"].ReadValue() + ",";
+                        skills += "\"info\":\"" + Regex.Replace(System.Security.SecurityElement.Escape(skill["info"].ReadString("")), @"\r\n?|\n", " ") + "\",";
+                        skills += "\"level\":" + skill["level"].ReadValue() + ",";
+                        skills += "\"skill\":" + skill["skill"].ReadValue() + "},";
                     }
                     skills = skills.Substring(0, skills.Length - 1);
                 }
                 skills += "]";
+
+                string JSON = "{";
+                JSON += "\"id\":" + mob.name.Replace(".img", "") + ",";
+                JSON += "\"icon\":\"" + icon + "\",";
+                JSON += "\"link\":" + link + ",";
+
+                JSON += "\"acc\":" + acc + ",";
+                JSON += "\"bodyAttack\":" + bodyAttack + ",";
+                JSON += "\"boss\":" + boss + ",";
+                JSON += "\"category\":" + category + ",";
+                JSON += "\"charismaEXP\":" + charismaEXP + ",";
+                JSON += "\"eva\":" + eva + ",";
+                JSON += "\"firstAttack\":" + firstAttack + ",";
+                JSON += "\"fs\":" + fs + ",";
+                JSON += "\"hpRecovery\":" + hpRecovery + ",";
+                JSON += "\"hpTagBgcolor\":" + hpTagBgcolor + ",";
+                JSON += "\"hpTagColor\":" + hpTagColor + ",";
+                JSON += "\"level\":" + level + ",";
+                JSON += "\"MADamage\":" + MADamage + ",";
+                JSON += "\"defaultHP\":" + defaultHP + ",";
+                JSON += "\"defaultMP\":" + defaultMP + ",";
+                JSON += "\"maxHP\":" + maxHP + ",";
+                JSON += "\"maxMP\":" + maxMP + ",";
+                JSON += "\"finalmaxHP\":" + finalmaxHP + ",";
+                JSON += "\"mbookID\":" + mbookID + ",";
+                JSON += "\"MDDamage\":" + MDDamage + ",";
+                JSON += "\"MDRate\":" + MDRate + ",";
+                JSON += "\"mobType\":" + mobType + ",";
+                JSON += "\"mpRecovery\":" + mpRecovery + ",";
+                JSON += "\"noFlip\":" + noFlip + ",";
+                JSON += "\"PADamage\":" + PADamage + ",";
+                JSON += "\"PDDamage\":" + PDDamage + ",";
+                JSON += "\"PDRate\":" + PDRate + ",";
+                JSON += "\"pushed\":" + pushed + ",";
+                JSON += "\"summonType\":" + summonType + ",";
+                JSON += "\"elemAttr\":" + elemAttr + ",";
+                JSON += "\"exp\":" + exp + ",";
+                JSON += "\"explosiveReward\":" + explosiveReward + ",";
+                JSON += "\"ignoreFieldOut\":" + ignoreFieldOut + ",";
+                JSON += "\"ignoreMoveImpact\":" + ignoreMoveImpact + ",";
+                JSON += "\"individualReward\":" + individualReward + ",";
+                JSON += "\"overSpeed\":" + overSpeed + ",";
+                JSON += "\"useReaction\":" + useReaction + ",";
+                JSON += "\"wp\":" + wp + ",";
+                JSON += "\"invincible\":" + invincible + ",";
+                JSON += "\"fixedDamage\":" + fixedDamage + ",";
+                JSON += "\"HPgaugeHide\":" + HPgaugeHide + ",";
+                JSON += "\"PassiveDisease\":" + PassiveDisease + ",";
+                JSON += "\"PartyBonusMob\":" + PartyBonusMob + ",";
+                JSON += "\"showNotRemoteDam\":" + showNotRemoteDam + ",";
+                JSON += "\"hideName\":" + hideName + ",";
+                JSON += "\"revive\":" + revive + ",";
+                JSON += "\"skill\":" + skills + "}";
+
+                using (TextWriter tw = new StreamWriter(File.Create(path + mob.name.Replace(".img", "") + ".json")))
+                {
+                    tw.Write(JSON);
+                }
+
             }
         }
 
