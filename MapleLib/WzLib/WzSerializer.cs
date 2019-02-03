@@ -484,7 +484,10 @@ namespace MapleLib.WzLib.Serialization
                     MobToJSON(dir, path);
                     break;
                 case "Map.wz":
-                    //MapToJSON(dir, path);
+                    MapToJSON(dir, path);
+                    break;
+                case "Npc.wz":
+                    NpcToJSON(dir, path);
                     break;
             }
         }
@@ -498,6 +501,193 @@ namespace MapleLib.WzLib.Serialization
         public void SerializeFile(WzFile file, string path)
         {
             SerializeDirectory(file.WzDirectory, path);
+        }
+
+        private void NpcToJSON(WzDirectory dir, string path)
+        {
+            dir.images.ForEach(npc =>
+            {
+                string icon = "";
+                string link = "";
+                if (npc["link"] != null)
+                {
+                    link = npc["link"].ReadString("");
+                }
+                try
+                {
+                    MemoryStream stream = new MemoryStream();
+                    WzCanvasProperty img = (WzCanvasProperty)npc["stand"]["0"];
+                    img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                    byte[] pngbytes = stream.ToArray();
+                    stream.Close();
+                    icon = Convert.ToBase64String(pngbytes);
+                }
+                catch (Exception ex)
+                {
+                    //No image available.
+                }
+
+                using (TextWriter tw = new StreamWriter(File.Create(path + npc.Name.Replace(".img", "") + ".json")))
+                {
+                    tw.Write("{\"link\":\"" + link + "\",\"icon\":\"" + icon + "\"}");
+                }
+            });
+        }
+
+        private void MapToJSON(WzDirectory dir, string path)
+        {
+            WzObject[] sections =
+                {
+                dir["Map"]["Map0"],
+                dir["Map"]["Map1"],
+                dir["Map"]["Map2"],
+                dir["Map"]["Map3"],
+                dir["Map"]["Map4"],
+                dir["Map"]["Map5"],
+                dir["Map"]["Map6"],
+                dir["Map"]["Map7"],
+                dir["Map"]["Map8"],
+                dir["Map"]["Map9"]
+                };
+
+            foreach (WzObject section in sections)
+            {
+                ((WzDirectory)section).WzImages.ForEach(map =>
+                {
+                    WzSubProperty info = (WzSubProperty)map["info"];
+                    WzSubProperty portal = (WzSubProperty)map["portal"];
+                    WzSubProperty reactor = (WzSubProperty)map["reactor"];
+                    WzSubProperty life = (WzSubProperty)map["life"];
+
+                    string icon = "";
+                    try
+                    {
+                        MemoryStream stream = new MemoryStream();
+                        WzImageProperty miniMap = map["miniMap"];
+                        WzCanvasProperty img = (WzCanvasProperty)miniMap["canvas"];
+                        img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        byte[] pngbytes = stream.ToArray();
+                        stream.Close();
+                        icon = Convert.ToBase64String(pngbytes);
+                    }
+                    catch (Exception ex)
+                    {
+                        //No minimap image available.
+                    }
+
+                    string bgm = info["bgm"] == null ? "" : info["bgm"].ReadString("");
+                    int cloud = info["cloud"] == null ? 0 : info["cloud"].ReadValue();
+                    int fieldLimit = info["fieldLimit"] == null ? 0 : info["fieldLimit"].ReadValue();
+                    string fieldScript = info["fieldScript"] == null ? "" : info["fieldScript"].ReadString("");
+                    int fly = info["fly"] == null ? 0 : info["fly"].ReadValue();
+                    int forcedReturn = info["forcedReturn"] == null ? 0 : info["forcedReturn"].ReadValue();
+                    int hideMinimap = info["hideMinimap"] == null ? 0 : info["hideMinimap"].ReadValue();
+                    string mapDesc = info["mapDesc"] == null ? "" : info["mapDesc"].ReadString("");
+                    string mapMark = info["mapMark"] == null ? "" : info["mapMark"].ReadString("");
+                    int mobRate = info["mobRate"] == null ? 0 : info["mobRate"].ReadValue();
+                    int moveLimit = info["moveLimit"] == null ? 0 : info["moveLimit"].ReadValue();
+                    int noMapCmd = info["noMapCmd"] == null ? 0 : info["noMapCmd"].ReadValue();
+                    string onFirstUserEnter = info["onFirstUserEnter"] == null ? "" : info["onFirstUserEnter"].ReadString("");
+                    string onUserEnter = info["onUserEnter"] == null ? "" : info["onUserEnter"].ReadString("");
+                    int returnMap = info["returnMap"] == null ? 0 : info["returnMap"].ReadValue();
+                    int swim = info["swim"] == null ? 0 : info["swim"].ReadValue();
+                    int town = info["town"] == null ? 0 : info["town"].ReadValue();
+                    int version = info["version"] == null ? 0 : info["version"].ReadValue();
+                    int standAlone = info["standAlone"] == null ? 0 : info["standAlone"].ReadValue();
+                    int partyStandAlone = info["partyStandAlone"] == null ? 0 : info["partyStandAlone"].ReadValue();
+
+                    string reactors = "[";
+                    if (reactor != null && reactor.WzProperties != null && reactor.WzProperties.Count() > 0)
+                    {
+                        reactor.WzProperties.ForEach(reactorEntry =>
+                        {
+                            reactors += "{\"id\":" + reactorEntry["id"].ReadValue() + ",";
+                            reactors += "\"f\":" + reactorEntry["f"].ReadValue() + ",";
+                            reactors += "\"name\":\"" + reactorEntry["name"].ReadString("") + "\",";
+                            reactors += "\"reactorTime\":" + reactorEntry["reactorTime"].ReadValue() + ",";
+                            reactors += "\"x\":" + reactorEntry["x"].ReadValue() + ",";
+                            reactors += "\"y\":" + reactorEntry["y"].ReadValue() + "},";
+                        });
+                        reactors = reactors.Substring(0, reactors.Length - 1) + "]";
+                    }
+                    else
+                    {
+                        reactors += "]";
+                    }
+
+                    string portals = "[";
+                    if (portal != null && portal.WzProperties != null && portal.WzProperties.Count() > 0)
+                    {
+                        portal.WzProperties.ForEach(portalEntry =>
+                        {
+                            portals += "{\"pn\":\"" + portalEntry["pn"].ReadString("") + "\",";
+                            portals += "\"pt\":" + portalEntry["pt"].ReadValue() + ",";
+                            portals += "\"tm\":" + portalEntry["tm"].ReadValue() + ",";
+                            portals += "\"tn\":\"" + portalEntry["tn"].ReadString("") + "\",";
+                            portals += "\"delay\":" + (portalEntry["delay"] == null ? 0 : portalEntry["delay"].ReadValue()) + ",";
+                            portals += "\"hideTooltip\":" + (portalEntry["hideTooltip"] == null ? 0 : portalEntry["hideTooltip"].ReadValue()) + ",";
+                            portals += "\"onlyOnce\":" + (portalEntry["onlyOnce"] == null ? 0 : portalEntry["onlyOnce"].ReadValue()) + ",";
+                            portals += "\"script\":\"" + (portalEntry["script"] == null ? "" : portalEntry["script"].ReadString("")) + "\",";
+                            portals += "\"x\":" + portalEntry["x"].ReadValue() + ",";
+                            portals += "\"y\":" + portalEntry["y"].ReadValue() + "},";
+                        });
+                        portals = portals.Substring(0, portals.Length - 1) + "]";
+                    }
+                    else
+                    {
+                        portals += "]";
+                    }
+
+                    string lifes = "[";
+                    if (life != null && life.WzProperties != null && life.WzProperties.Count() > 0)
+                    {
+                        life.WzProperties.ForEach(lifeEntry =>
+                        {
+                            lifes += "{\"id\":" + lifeEntry["id"].ReadValue() + ",";
+                            lifes += "\"cy\":" + lifeEntry["cy"].ReadValue() + ",";
+                            lifes += "\"fh\":" + lifeEntry["fh"].ReadValue() + ",";
+                            lifes += "\"rx0\":" + lifeEntry["rx0"].ReadValue() + ",";
+                            lifes += "\"rx1\":" + lifeEntry["rx1"].ReadValue() + ",";
+                            lifes += "\"type\":\"" + lifeEntry["type"].ReadString("") + "\",";
+                            lifes += "\"x\":" + lifeEntry["x"].ReadValue() + ",";
+                            lifes += "\"y\":" + lifeEntry["y"].ReadValue() + "},";
+                        });
+                        lifes = lifes.Substring(0, lifes.Length - 1) + "]";
+                    }
+                    else
+                    {
+                        lifes += "]";
+                    }
+
+                    using (TextWriter tw = new StreamWriter(File.Create(path + int.Parse(map.Name.Replace(".img", "")) + ".json")))
+                    {
+                        tw.Write("{\"icon\":\"" + icon + "\",");
+                        tw.Write("\"bgm\":\"" + bgm + "\",");
+                        tw.Write("\"cloud\":" + cloud + ",");
+                        tw.Write("\"fieldLimit\":" + fieldLimit + ",");
+                        tw.Write("\"fieldScript\":\"" + fieldScript + "\",");
+                        tw.Write("\"fly\":" + fly + ",");
+                        tw.Write("\"forcedReturn\":" + forcedReturn + ",");
+                        tw.Write("\"hideMinimap\":" + hideMinimap + ",");
+                        tw.Write("\"mapDesc\":\"" + mapDesc + "\",");
+                        tw.Write("\"mapMark\":\"" + mapMark + "\",");
+                        tw.Write("\"mobRate\":" + mobRate + ",");
+                        tw.Write("\"moveLimit\":" + moveLimit + ",");
+                        tw.Write("\"noMapCmd\":" + noMapCmd + ",");
+                        tw.Write("\"onFirstUserEnter\":\"" + onFirstUserEnter + "\",");
+                        tw.Write("\"onUserEnter\":\"" + onUserEnter + "\",");
+                        tw.Write("\"returnMap\":" + returnMap + ",");
+                        tw.Write("\"swim\":" + swim + ",");
+                        tw.Write("\"town\":" + town + ",");
+                        tw.Write("\"version\":" + version + ",");
+                        tw.Write("\"standAlone\":" + standAlone + ",");
+                        tw.Write("\"partyStandAlone\":" + partyStandAlone + ",");
+                        tw.Write("\"portal\":" + portals + ",");
+                        tw.Write("\"life\":" + lifes + ",");
+                        tw.Write("\"reactor\":" + reactors + "}");
+                    }
+                });
+            }
         }
 
         private void MobToJSON(WzDirectory dir, string path)
@@ -537,18 +727,18 @@ namespace MapleLib.WzLib.Serialization
                         stream.Close();
                         icon = Convert.ToBase64String(pngbytes);
                     }
-                    else if (info["stand"] != null && info["stand"]["0"] != null)
+                    else if (mob["stand"] != null && mob["stand"]["0"] != null)
                     {
                         MemoryStream stream = new MemoryStream();
-                        if (info["stand"]["0"].PropertyType == WzPropertyType.Canvas)
+                        if (mob["stand"]["0"].PropertyType == WzPropertyType.Canvas)
                         {
-                            WzCanvasProperty img = (WzCanvasProperty)info["stand"]["0"];
+                            WzCanvasProperty img = (WzCanvasProperty)mob["stand"]["0"];
                             if (img == null) continue;
                             img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
                         }
-                        else if (info["stand"]["0"].PropertyType == WzPropertyType.UOL)
+                        else if (mob["stand"]["0"].PropertyType == WzPropertyType.UOL)
                         {
-                            WzUOLProperty uol = (WzUOLProperty)info["stand"]["0"];
+                            WzUOLProperty uol = (WzUOLProperty)mob["stand"]["0"];
                             WzCanvasProperty img = (WzCanvasProperty)uol.LinkValue;
                             if (img == null) continue;
                             img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
@@ -558,63 +748,152 @@ namespace MapleLib.WzLib.Serialization
                         stream.Close();
                         icon = Convert.ToBase64String(pngbytes);
                     }
+                    else if (mob["stand"] != null && mob["stand"]["123"] != null)
+                    {
+                        MemoryStream stream = new MemoryStream();
+                        if (mob["stand"]["123"].PropertyType == WzPropertyType.Canvas)
+                        {
+                            WzCanvasProperty img = (WzCanvasProperty)mob["stand"]["123"];
+                            if (img == null) continue;
+                            img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                        else if (mob["stand"]["123"].PropertyType == WzPropertyType.UOL)
+                        {
+                            WzUOLProperty uol = (WzUOLProperty)mob["stand"]["123"];
+                            WzCanvasProperty img = (WzCanvasProperty)uol.LinkValue;
+                            if (img == null) continue;
+                            img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+
+                        byte[] pngbytes = stream.ToArray();
+                        stream.Close();
+                        icon = Convert.ToBase64String(pngbytes);
+                    }
+                    else if (mob["stand"] != null && mob["stand"]["3"] != null)
+                    {
+                        MemoryStream stream = new MemoryStream();
+                        if (mob["stand"]["3"].PropertyType == WzPropertyType.Canvas)
+                        {
+                            WzCanvasProperty img = (WzCanvasProperty)mob["stand"]["3"];
+                            if (img == null) continue;
+                            img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                        else if (mob["stand"]["3"].PropertyType == WzPropertyType.UOL)
+                        {
+                            WzUOLProperty uol = (WzUOLProperty)mob["stand"]["3"];
+                            WzCanvasProperty img = (WzCanvasProperty)uol.LinkValue;
+                            if (img == null) continue;
+                            img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+
+                        byte[] pngbytes = stream.ToArray();
+                        stream.Close();
+                        icon = Convert.ToBase64String(pngbytes);
+                    }
+                    else if (mob["fly"] != null && mob["fly"]["0"] != null)
+                    {
+                        MemoryStream stream = new MemoryStream();
+                        if (mob["fly"]["0"].PropertyType == WzPropertyType.Canvas)
+                        {
+                            WzCanvasProperty img = (WzCanvasProperty)mob["fly"]["0"];
+                            if (img == null) continue;
+                            img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                        else if (mob["fly"]["0"].PropertyType == WzPropertyType.UOL)
+                        {
+                            WzUOLProperty uol = (WzUOLProperty)mob["fly"]["0"];
+                            WzCanvasProperty img = (WzCanvasProperty)uol.LinkValue;
+                            if (img == null) continue;
+                            img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+
+                        byte[] pngbytes = stream.ToArray();
+                        stream.Close();
+                        icon = Convert.ToBase64String(pngbytes);
+                    }
+                    else if (mob["fly"] != null && mob["fly"]["001"] != null)
+                    {
+                        MemoryStream stream = new MemoryStream();
+                        if (mob["fly"]["001"].PropertyType == WzPropertyType.Canvas)
+                        {
+                            WzCanvasProperty img = (WzCanvasProperty)mob["fly"]["001"];
+                            if (img == null) continue;
+                            img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                        else if (mob["fly"]["001"].PropertyType == WzPropertyType.UOL)
+                        {
+                            WzUOLProperty uol = (WzUOLProperty)mob["fly"]["001"];
+                            WzCanvasProperty img = (WzCanvasProperty)uol.LinkValue;
+                            if (img == null) continue;
+                            img.PngProperty.GetPNG(false).Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+
+                        byte[] pngbytes = stream.ToArray();
+                        stream.Close();
+                        icon = Convert.ToBase64String(pngbytes);
+                    }
+                    else
+                    {
+                        MessageBox.Show("No icon or link found for Monster.", "Error: " + mob.name, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 }
 
                 int acc = info["acc"] == null ? 0 : info["acc"].ReadValue();
                 int bodyAttack = info["bodyAttack"] == null ? 0 : info["bodyAttack"].ReadValue();
-                int boss = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int category = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int charismaEXP = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int eva = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int firstAttack = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int fs = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int hpRecovery = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int hpTagBgcolor = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int hpTagColor = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int level = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int MADamage = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                long defaultHP = info["acc"] == null ? 0 : info["acc"].ReadLong();
-                long defaultMP = info["acc"] == null ? 0 : info["acc"].ReadLong();
-                long maxHP = info["acc"] == null ? 0 : info["acc"].ReadLong();
-                long maxMP = info["acc"] == null ? 0 : info["acc"].ReadLong();
-                long finalmaxHP = info["acc"] == null ? 0 : info["acc"].ReadLong();
-                int mbookID = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int MDDamage = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int MDRate = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int mobType = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int mpRecovery = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int noFlip = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int PADamage = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int PDDamage = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int PDRate = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int pushed = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int summonType = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int elemAttr = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                long exp = info["acc"] == null ? 0 : info["acc"].ReadLong();
-                int explosiveReward = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int ignoreFieldOut = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int ignoreMoveImpact = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int individualReward = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int overSpeed = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int useReaction = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int wp = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int invincible = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int fixedDamage = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int HPgaugeHide = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int PassiveDisease = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int PartyBonusMob = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int showNotRemoteDam = info["acc"] == null ? 0 : info["acc"].ReadValue();
-                int hideName = info["acc"] == null ? 0 : info["acc"].ReadValue();
+                int boss = info["boss"] == null ? 0 : info["boss"].ReadValue();
+                int category = info["category"] == null ? 0 : info["category"].ReadValue();
+                int charismaEXP = info["charismaEXP"] == null ? 0 : info["charismaEXP"].ReadValue();
+                int eva = info["eva"] == null ? 0 : info["eva"].ReadValue();
+                int firstAttack = info["firstAttack"] == null ? 0 : info["firstAttack"].ReadValue();
+                int fs = info["fs"] == null ? 0 : info["fs"].ReadValue();
+                int hpRecovery = info["hpRecovery"] == null ? 0 : info["hpRecovery"].ReadValue();
+                int hpTagBgcolor = info["hpTagBgcolor"] == null ? 0 : info["hpTagBgcolor"].ReadValue();
+                int hpTagColor = info["hpTagColor"] == null ? 0 : info["hpTagColor"].ReadValue();
+                int level = info["level"] == null ? 0 : info["level"].ReadValue();
+                int MADamage = info["MADamage"] == null ? 0 : info["MADamage"].ReadValue();
+                long defaultHP = info["defaultHP"] == null ? 0 : info["defaultHP"].ReadLong();
+                long defaultMP = info["defaultMP"] == null ? 0 : info["defaultMP"].ReadLong();
+                long maxHP = info["maxHP"] == null ? 0 : info["maxHP"].ReadLong();
+                long maxMP = info["maxMP"] == null ? 0 : info["maxMP"].ReadLong();
+                long finalmaxHP = info["finalmaxHP"] == null ? 0 : info["finalmaxHP"].ReadLong();
+                int mbookID = info["mbookID"] == null ? 0 : info["mbookID"].ReadValue();
+                int MDDamage = info["MDDamage"] == null ? 0 : info["MDDamage"].ReadValue();
+                int MDRate = info["MDRate"] == null ? 0 : info["MDRate"].ReadValue();
+                string mobType = info["mobType"] == null ? "" : info["mobType"].ReadString("");
+                int mpRecovery = info["mpRecovery"] == null ? 0 : info["mpRecovery"].ReadValue();
+                int noFlip = info["noFlip"] == null ? 0 : info["noFlip"].ReadValue();
+                int PADamage = info["PADamage"] == null ? 0 : info["PADamage"].ReadValue();
+                int PDDamage = info["PDDamage"] == null ? 0 : info["PDDamage"].ReadValue();
+                int PDRate = info["PDRate"] == null ? 0 : info["PDRate"].ReadValue();
+                int pushed = info["pushed"] == null ? 0 : info["pushed"].ReadValue();
+                int summonType = info["summonType"] == null ? 0 : info["summonType"].ReadValue();
+                string elemAttr = info["elemAttr"] == null ? "" : info["elemAttr"].ReadString("");
+                long exp = info["exp"] == null ? 0 : info["exp"].ReadLong();
+                int explosiveReward = info["explosiveReward"] == null ? 0 : info["explosiveReward"].ReadValue();
+                int ignoreFieldOut = info["ignoreFieldOut"] == null ? 0 : info["ignoreFieldOut"].ReadValue();
+                int ignoreMoveImpact = info["ignoreMoveImpact"] == null ? 0 : info["ignoreMoveImpact"].ReadValue();
+                int individualReward = info["individualReward"] == null ? 0 : info["individualReward"].ReadValue();
+                int overSpeed = info["overSpeed"] == null ? 0 : info["overSpeed"].ReadValue();
+                int useReaction = info["useReaction"] == null ? 0 : info["useReaction"].ReadValue();
+                int wp = info["wp"] == null ? 0 : info["wp"].ReadValue();
+                int invincible = info["invincible"] == null ? 0 : info["invincible"].ReadValue();
+                int fixedDamage = info["fixedDamage"] == null ? 0 : info["fixedDamage"].ReadValue();
+                int HPgaugeHide = info["HPgaugeHide"] == null ? 0 : info["HPgaugeHide"].ReadValue();
+                int PassiveDisease = info["PassiveDisease"] == null ? 0 : info["PassiveDisease"].ReadValue();
+                int PartyBonusMob = info["PartyBonusMob"] == null ? 0 : info["PartyBonusMob"].ReadValue();
+                int showNotRemoteDam = info["showNotRemoteDam"] == null ? 0 : info["showNotRemoteDam"].ReadValue();
+                int hideName = info["hideName"] == null ? 0 : info["hideName"].ReadValue();
+                int changeableMob = info["changeableMob"] == null ? 0 : info["changeableMob"].ReadValue();
 
                 //Revive: mobs spawned upon death.
                 string revive = "[";
                 if (info["revive"] != null)
                 {
-                    info["revive"].WzProperties.ForEach(elem => 
+                    info["revive"].WzProperties.ForEach(elem =>
                     {
                         if (elem.PropertyType == WzPropertyType.String)
                         {
-                            revive += ((WzStringProperty)elem).ReadString("") + ","; 
+                            revive += ((WzStringProperty)elem).ReadString("") + ",";
                         }
                         else
                         {
@@ -642,7 +921,7 @@ namespace MapleLib.WzLib.Serialization
                 skills += "]";
 
                 string JSON = "{";
-                JSON += "\"id\":" + mob.name.Replace(".img", "") + ",";
+                JSON += "\"id\":" + int.Parse(mob.name.Replace(".img", "")) + ",";
                 JSON += "\"icon\":\"" + icon + "\",";
                 JSON += "\"link\":" + link + ",";
 
@@ -667,7 +946,7 @@ namespace MapleLib.WzLib.Serialization
                 JSON += "\"mbookID\":" + mbookID + ",";
                 JSON += "\"MDDamage\":" + MDDamage + ",";
                 JSON += "\"MDRate\":" + MDRate + ",";
-                JSON += "\"mobType\":" + mobType + ",";
+                JSON += "\"mobType\":\"" + mobType + "\",";
                 JSON += "\"mpRecovery\":" + mpRecovery + ",";
                 JSON += "\"noFlip\":" + noFlip + ",";
                 JSON += "\"PADamage\":" + PADamage + ",";
@@ -675,7 +954,7 @@ namespace MapleLib.WzLib.Serialization
                 JSON += "\"PDRate\":" + PDRate + ",";
                 JSON += "\"pushed\":" + pushed + ",";
                 JSON += "\"summonType\":" + summonType + ",";
-                JSON += "\"elemAttr\":" + elemAttr + ",";
+                JSON += "\"elemAttr\":\"" + elemAttr + "\",";
                 JSON += "\"exp\":" + exp + ",";
                 JSON += "\"explosiveReward\":" + explosiveReward + ",";
                 JSON += "\"ignoreFieldOut\":" + ignoreFieldOut + ",";
@@ -691,10 +970,11 @@ namespace MapleLib.WzLib.Serialization
                 JSON += "\"PartyBonusMob\":" + PartyBonusMob + ",";
                 JSON += "\"showNotRemoteDam\":" + showNotRemoteDam + ",";
                 JSON += "\"hideName\":" + hideName + ",";
+                JSON += "\"changeableMob\":" + changeableMob + ",";
                 JSON += "\"revive\":" + revive + ",";
                 JSON += "\"skill\":" + skills + "}";
 
-                using (TextWriter tw = new StreamWriter(File.Create(path + mob.name.Replace(".img", "") + ".json")))
+                using (TextWriter tw = new StreamWriter(File.Create(path + int.Parse(mob.name.Replace(".img", "")) + ".json")))
                 {
                     tw.Write(JSON);
                 }
@@ -737,7 +1017,7 @@ namespace MapleLib.WzLib.Serialization
                 foreach (WzImage item in cat.WzImages)
                 {
                     String JSON = "{";
-                    JSON += "\"id\":\"" + item.name.Replace(".img", "") + "\",";
+                    JSON += "\"id\":\"" + int.Parse(item.name.Replace(".img", "")) + "\",";
 
                     WzSubProperty info = (WzSubProperty)item["info"];
 
@@ -1238,7 +1518,7 @@ namespace MapleLib.WzLib.Serialization
                     JSON += "\"incLuk\":\"" + incLuk + "\",";
                     JSON += "\"incAttackCount\":\"" + incAttackCount + "\",";
 
-                    using (TextWriter tw = new StreamWriter(File.Create(path + item.name.Replace(".img", "") + ".json")))
+                    using (TextWriter tw = new StreamWriter(File.Create(path + int.Parse(item.name.Replace(".img", "")) + ".json")))
                     {
                         tw.Write(JSON.Substring(0, JSON.Length - 1) + "}");
                     }
@@ -1271,6 +1551,30 @@ namespace MapleLib.WzLib.Serialization
             }
         }
 
+        private void ItemStringsToJSON(WzImage cat, string path)
+        {
+            string list = "[";
+            foreach (WzSubProperty item in cat.WzProperties)
+            {
+                String JSON = "{";
+                string name = FixStringTabs(Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " "));
+                JSON += "\"id\": " + int.Parse(item.name) + ",";
+                JSON += "\"type\": \"" + cat.name.Replace(".img", "") + "\",";
+                JSON += "\"name\": \"" + name + "\",";
+                JSON += "\"desc\": \"" + FixStringTabs(Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ")) + "\"}";
+                using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + int.Parse(item.name) + ".json")))
+                {
+                    tw.Write(JSON);
+                }
+                list += "{\"id\":" + int.Parse(item.name) + ",\"name\":\"" + name + "\"},";
+            }
+            list = list.Substring(0, list.Length - 1) + "]";
+            using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + cat.name.Replace(".img", "") + ".json")))
+            {
+                tw.Write(list);
+            }
+        }
+
         private void StringToJSON(WzDirectory dir, string path)
         {
             //Items
@@ -1286,87 +1590,57 @@ namespace MapleLib.WzLib.Serialization
                 Directory.CreateDirectory(path + @"\item\");
             }
 
-            foreach (WzSubProperty item in Cash.WzProperties)
-            {
-                String JSON = "{";
-                JSON += "\"id\": " + item.name + ",";
-                JSON += "\"type\": \"Cash\",";
-                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " ") + "\",";
-                JSON += "\"desc\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
-                using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + item.name + ".json")))
-                {
-                    tw.Write(JSON);
-                }
-            }
+            ItemStringsToJSON(Cash, path);
+            ItemStringsToJSON(Consume, path);
+            ItemStringsToJSON(Ins, path);
+            ItemStringsToJSON(Pet, path);
 
-            foreach (WzSubProperty item in Consume.WzProperties)
-            {
-                String JSON = "{";
-                JSON += "\"id\": " + item.name + ",";
-                JSON += "\"type\": \"Consume\",";
-                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " ") + "\",";
-                JSON += "\"desc\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
-                using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + item.name + ".json")))
-                {
-                    tw.Write(JSON);
-                }
-            }
-
-            foreach (WzSubProperty item in Ins.WzProperties)
-            {
-                String JSON = "{";
-                JSON += "\"id\": " + item.name + ",";
-                JSON += "\"type\": \"Setup\",";
-                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " ") + "\",";
-                JSON += "\"desc\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
-                using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + item.name + ".json")))
-                {
-                    tw.Write(JSON);
-                }
-            }
-
-            foreach (WzSubProperty item in Pet.WzProperties)
-            {
-                String JSON = "{";
-                JSON += "\"id\": " + item.name + ",";
-                JSON += "\"type\": \"Pet\",";
-                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " ") + "\",";
-                JSON += "\"desc\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
-                using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + item.name + ".json")))
-                {
-                    tw.Write(JSON);
-                }
-            }
-
+            //Etc
+            string etclist = "[";
             foreach (WzSubProperty item in Etc["Etc"].WzProperties)
             {
                 String JSON = "{";
-                JSON += "\"id\": " + item.name + ",";
-                JSON += "\"type\": \"Etc\",";
-                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " ") + "\",";
-                JSON += "\"desc\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
-                using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + item.name + ".json")))
+                string name = FixStringTabs(Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " "));
+                JSON += "\"id\": " + int.Parse(item.name) + ",";
+                JSON += "\"type\": \"Equip\",";
+                JSON += "\"name\": \"" + name + "\",";
+                JSON += "\"desc\": \"" + FixStringTabs(Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ")) + "\"}";
+                etclist += "{\"id\":" + int.Parse(item.name) + ",\"name\":\"" + name + "\"},";
+                using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + int.Parse(item.name) + ".json")))
                 {
                     tw.Write(JSON);
                 }
             }
+            etclist = etclist.Substring(0, etclist.Length - 1) + "]";
+            using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\Etc.json")))
+            {
+                tw.Write(etclist);
+            }
 
-
-            foreach (WzSubProperty cat in Eqp.WzProperties)
+            //Eqp
+            string eqlist = "[";
+            foreach (WzSubProperty cat in Eqp["Eqp"].WzProperties)
             {
                 foreach (WzSubProperty item in cat.WzProperties)
                 {
                     String JSON = "{";
-                    JSON += "\"id\": " + item.name + ",";
+                    string name = FixStringTabs(Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " "));
+                    JSON += "\"id\": " + int.Parse(item.name) + ",";
                     JSON += "\"type\": \"Equip\",";
                     JSON += "\"category\": \"" + cat.name + "\",";
-                    JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["name"].ReadString("")), @"\r\n?|\n", " ") + "\",";
-                    JSON += "\"desc\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
-                    using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + item.name + ".json")))
+                    JSON += "\"name\": \"" + name + "\",";
+                    JSON += "\"desc\": \"" + FixStringTabs(Regex.Replace(System.Security.SecurityElement.Escape(item["desc"].ReadString("")), @"\r\n?|\n", " ")) + "\"}";
+                    eqlist += "{\"id\":" + int.Parse(item.name) + ",\"name\":\"" + name + "\"},";
+                    using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\" + int.Parse(item.name) + ".json")))
                     {
                         tw.Write(JSON);
                     }
                 }
+            }
+            eqlist = eqlist.Substring(0, eqlist.Length - 1) + "]";
+            using (TextWriter tw = new StreamWriter(File.Create(path + @"\item\Eqp.json")))
+            {
+                tw.Write(eqlist);
             }
 
             if (!Directory.Exists(path + @"\npc\"))
@@ -1375,16 +1649,24 @@ namespace MapleLib.WzLib.Serialization
             }
 
             //Npc
+            string npclist = "[";
             WzImage Npc = (WzImage)dir["Npc.img"];
             foreach (WzSubProperty npc in Npc.WzProperties)
             {
                 String JSON = "{";
-                JSON += "\"id\": " + npc.name + ",";
-                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(npc["name"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
-                using (TextWriter tw = new StreamWriter(File.Create(path + @"\npc\" + npc.name + ".json")))
+                string name = FixStringTabs(Regex.Replace(System.Security.SecurityElement.Escape(npc["name"].ReadString("")), @"\r\n?|\n", " "));
+                JSON += "\"id\": " + int.Parse(npc.name) + ",";
+                JSON += "\"name\": \"" + name + "\"}";
+                npclist += "{\"id\":" + int.Parse(npc.name) + ",\"name\":\"" + name + "\"},";
+                using (TextWriter tw = new StreamWriter(File.Create(path + @"\npc\" + int.Parse(npc.name) + ".json")))
                 {
                     tw.Write(JSON);
                 }
+            }
+            npclist = npclist.Substring(0, npclist.Length - 1) + "]";
+            using (TextWriter tw = new StreamWriter(File.Create(path + @"\npc\Npc.json")))
+            {
+                tw.Write(npclist);
             }
 
             if (!Directory.Exists(path + @"\mob\"))
@@ -1393,16 +1675,24 @@ namespace MapleLib.WzLib.Serialization
             }
 
             //Mob
+            string moblist = "[";
             WzImage Mob = (WzImage)dir["Mob.img"];
             foreach (WzSubProperty mob in Mob.WzProperties)
             {
                 String JSON = "{";
-                JSON += "\"id\": " + mob.name + ",";
-                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(mob["name"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
-                using (TextWriter tw = new StreamWriter(File.Create(path + @"\mob\" + mob.name + ".json")))
+                string name = FixStringTabs(Regex.Replace(System.Security.SecurityElement.Escape(mob["name"].ReadString("")), @"\r\n?|\n", " "));
+                JSON += "\"id\": " + int.Parse(mob.name) + ",";
+                JSON += "\"name\": \"" + name + "\"}";
+                moblist += "{\"id\":" + int.Parse(mob.name) + ",\"name\":\"" + name + "\"},";
+                using (TextWriter tw = new StreamWriter(File.Create(path + @"\mob\" + int.Parse(mob.name) + ".json")))
                 {
                     tw.Write(JSON);
                 }
+            }
+            moblist = moblist.Substring(0, moblist.Length - 1) + "]";
+            using (TextWriter tw = new StreamWriter(File.Create(path + @"\mob\Mob.json")))
+            {
+                tw.Write(moblist);
             }
 
             if (!Directory.Exists(path + @"\map\"))
@@ -1411,21 +1701,29 @@ namespace MapleLib.WzLib.Serialization
             }
 
             //Map
+            string maplist = "[";
             WzImage Map = (WzImage)dir["Map.img"];
             foreach (WzSubProperty cat in Map.WzProperties)
             {
                 foreach (WzSubProperty map in cat.WzProperties)
                 {
                     String JSON = "{";
-                    JSON += "{\"id\": " + map.name + ",";
-                    JSON += "\"type\": \"" + cat.name + "\",";
-                    JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(map["mapName"].ReadString("")), @"\r\n?|\n", " ") + "\",";
-                    JSON += "\"street\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(map["streetName"].ReadString("")), @"\r\n?|\n", " ") + "\"}";
-                    using (TextWriter tw = new StreamWriter(File.Create(path + @"\map\" + map.name + ".json")))
+                    string name = FixStringTabs(Regex.Replace(System.Security.SecurityElement.Escape(map["mapName"].ReadString("")), @"\r\n?|\n", " "));
+                    JSON += "\"id\": " + int.Parse(map.name) + ",";
+                    JSON += "\"region\": \"" + cat.name + "\",";
+                    JSON += "\"name\": \"" + name + "\",";
+                    JSON += "\"street\": \"" + FixStringTabs(Regex.Replace(System.Security.SecurityElement.Escape(map["streetName"].ReadString("")), @"\r\n?|\n", " ")) + "\"}";
+                    maplist += "{\"id\":" + int.Parse(map.name) + ",\"name\":\"" + name + "\"},";
+                    using (TextWriter tw = new StreamWriter(File.Create(path + @"\map\" + int.Parse(map.name) + ".json")))
                     {
                         tw.Write(JSON);
                     }
                 }
+            }
+            maplist = maplist.Substring(0, maplist.Length - 1) + "]";
+            using (TextWriter tw = new StreamWriter(File.Create(path + @"\map\Map.json")))
+            {
+                tw.Write(maplist);
             }
 
             if (!Directory.Exists(path + @"\skill\"))
@@ -1434,19 +1732,37 @@ namespace MapleLib.WzLib.Serialization
             }
 
             //Skill
+            string skilllist = "[";
             WzImage Skill = (WzImage)dir["Skill.img"];
             foreach (WzSubProperty skill in Skill.WzProperties)
             {
                 String JSON = "{";
+                string name = FixStringTabs(Regex.Replace(System.Security.SecurityElement.Escape(skill["name"].ReadString("")), @"\r\n?|\n", " "));
                 if (skill["bookName"] != null) continue;
-                JSON += "{\"id\": " + skill.name + ",";
-                JSON += "\"name\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(skill["name"].ReadString("")), @"\r\n?|\n", " ") + "\",";
-                JSON += "\"desc\": \"" + Regex.Replace(System.Security.SecurityElement.Escape(skill["desc"].ReadString("")), @"\r\n?|\n", " ") + "\"},";
-                using (TextWriter tw = new StreamWriter(File.Create(path + @"\skill\" + skill.name + ".json")))
+                JSON += "\"id\": " + int.Parse(skill.name) + ",";
+                JSON += "\"name\": \"" + name + "\",";
+                JSON += "\"desc\": \"" + FixStringTabs(Regex.Replace(System.Security.SecurityElement.Escape(skill["desc"].ReadString("")), @"\r\n?|\n", " ")) + "\"},";
+                skilllist += "{\"id\":" + int.Parse(skill.name) + ",\"name\":\"" + name + "\"},";
+                using (TextWriter tw = new StreamWriter(File.Create(path + @"\skill\" + int.Parse(skill.name) + ".json")))
                 {
                     tw.Write(JSON);
                 }
             }
+            skilllist = skilllist.Substring(0, skilllist.Length - 1) + "]";
+            using (TextWriter tw = new StreamWriter(File.Create(path + @"\skill\Skill.json")))
+            {
+                tw.Write(skilllist);
+            }
+        }
+
+        private string FixStringTabs(string str)
+        {
+            string line = str.Replace("\t", " ");
+            while (line.IndexOf("  ") >= 0)
+            {
+                line = line.Replace("  ", " ");
+            }
+            return line;
         }
 
         private void ItemToJSON(WzDirectory dir, string path)
@@ -1482,7 +1798,7 @@ namespace MapleLib.WzLib.Serialization
                             continue;
                         }
 
-                        using (TextWriter tw = new StreamWriter(File.Create(path + item.name + ".json")))
+                        using (TextWriter tw = new StreamWriter(File.Create(path + int.Parse(item.name) + ".json")))
                         {
                             //Get Icon
                             MemoryStream stream = new MemoryStream();
